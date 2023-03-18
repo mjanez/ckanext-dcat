@@ -22,6 +22,9 @@ from ckan.plugins import toolkit
 from ckan.lib.munge import munge_tag
 from ckanext.dcat.urls import url_for
 from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS
+import os
+import pandas as pd
+from pathlib import Path
 
 DCT = Namespace("http://purl.org/dc/terms/")
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
@@ -37,6 +40,27 @@ OWL = Namespace('http://www.w3.org/2002/07/owl#')
 SPDX = Namespace('http://spdx.org/rdf/terms#')
 
 GEOJSON_IMT = 'https://www.iana.org/assignments/media-types/application/vnd.geo+json'
+CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
+
+# CKAN field_name for national DCAT theme URIs.
+DCAT_THEME_NATIONAL = 'theme_es'
+
+# DFs with MD INSPIRE Register codelists
+codelist_paths = [os.path.join(CODELISTS_DIR, f) for f in os.listdir(CODELISTS_DIR) if f.endswith(".csv")]
+codelists_dfs = {}
+
+# Iterate over file paths and read in data
+for file_path in codelist_paths:
+    with open(file_path, "r") as f:
+        df = pd.read_csv(f, index_col=None, header=0, delimiter="|", dtype=str)
+        df.columns = df.columns.str.lower()
+        file_name = os.path.splitext(os.path.basename(file_path))[0].lower()
+        codelists_dfs[file_name] = df
+
+# INSPIRE Codelists
+MD_INSPIRE_REGISTER = pd.concat(codelists_dfs.values(), axis=0, ignore_index=True)
+MD_FORMAT = codelists_dfs.get("file-type")
+MD_THEME_NATIONAL = codelists_dfs.get(DCAT_THEME_NATIONAL)
 
 namespaces = {
     'dct': DCT,
@@ -163,7 +187,21 @@ class RDFProfile(object):
         for keyword in keywords_with_commas:
             keywords.remove(keyword)
             keywords.extend([k.strip() for k in keyword.split(',')])
+
         return keywords
+    
+    def _themes(self, dataset_ref):
+        '''
+        Returns all DCAT themes on a particular dataset
+        '''
+        themes = self._object_value_list(dataset_ref, DCAT.theme) or []
+        # Split theme with commas
+        themes_with_commas = [t for t in themes if ',' in t]
+        for theme in themes_with_commas:
+            themes.remove(theme)
+            themes.extend([t.strip() for t in theme.split(',')])
+
+        return themes
 
     def _object(self, subject, predicate):
         '''
@@ -383,6 +421,7 @@ class RDFProfile(object):
                 <foaf:mbox>contact@some.org</foaf:mbox>
                 <foaf:homepage>http://some.org</foaf:homepage>
                 <dct:type rdf:resource="http://purl.org/adms/publishertype/NonProfitOrganisation"/>
+                <dct:identifier>EA349s92</dct:identifier>
             </foaf:Organization>
         </dct:publisher>
 
@@ -392,6 +431,7 @@ class RDFProfile(object):
             'email': 'contact@some.org',
             'url': 'http://some.org',
             'type': 'http://purl.org/adms/publishertype/NonProfitOrganisation',
+            'identifier': 'EA349s92'
         }
 
         <dct:publisher rdf:resource="http://publications.europa.eu/resource/authority/corporate-body/EURCOU" />
@@ -419,6 +459,8 @@ class RDFProfile(object):
 
             publisher['type'] = self._object_value(agent, DCT.type)
 
+            publisher['identifier'] = self._object_value(agent, DCT.identifier)
+
         return publisher
 
     def _contact_details(self, subject, predicate):
@@ -427,7 +469,26 @@ class RDFProfile(object):
 
         Both subject and predicate must be rdflib URIRef or BNode objects
 
-        Returns keys for uri, name and email with the values set to
+        Examples:
+
+        <dcat:contactPoint>
+            <vcard:Organization rdf:nodeID="Nc320885686e84382a0a2ea602ebde399">
+                <vcard:fn>Contact Point for dataset 1</vcard:fn>
+                <vcard:hasEmail rdf:resource="mailto:contact@some.org"/>
+                <vcard:hasURL>http://some.org<vcard:hasURL>
+                <vcard:role>pointOfContact<vcard:role>
+            </vcard:Organization>
+        </dcat:contactPoint>
+
+        {
+            'uri': 'http://orgs.vocab.org/some-org',
+            'name': 'Contact Point for dataset 1',
+            'email': 'contact@some.org',
+            'url': 'http://some.org',
+            'role': 'pointOfContact',
+        }
+
+        Returns keys for uri, name, email and url with the values set to
         an empty string if they could not be found
         '''
 
@@ -439,6 +500,10 @@ class RDFProfile(object):
                               rdflib.term.URIRef) else '')
 
             contact['name'] = self._get_vcard_property_value(agent, VCARD.hasFN, VCARD.fn)
+
+            contact['url'] = self._get_vcard_property_value(agent, VCARD.hasURL)
+
+            contact['role'] = self._get_vcard_property_value(agent, VCARD.role)
 
             contact['email'] = self._without_mailto(self._get_vcard_property_value(agent, VCARD.hasEmail))
 
@@ -1033,12 +1098,15 @@ class EuropeanDCATAPProfile(RDFProfile):
         for key, predicate, in (
                 ('language', DCT.language),
                 ('theme', DCAT.theme),
-                ('alternate_identifier', ADMS.identifier),
+                (DCAT_THEME_NATIONAL, DCAT.theme),
+                ('alternate_identifer', ADMS.identifier),
+                ('inspire_id', ADMS.identifier),
                 ('conforms_to', DCT.conformsTo),
                 ('documentation', FOAF.page),
                 ('related_resource', DCT.relation),
                 ('has_version', DCT.hasVersion),
                 ('is_version_of', DCT.isVersionOf),
+                ('lineage_source', DCT.source),
                 ('source', DCT.source),
                 ('sample', ADMS.sample),
                 ):
@@ -1054,7 +1122,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             contact = self._contact_details(dataset_ref, ADMS.contactPoint)
 
         if contact:
-            for key in ('uri', 'name', 'email'):
+            for key in ('uri', 'name', 'email', 'url', 'role'):
                 if contact.get(key):
                     dataset_dict['extras'].append(
                         {'key': 'contact_{0}'.format(key),
@@ -1062,7 +1130,7 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         # Publisher
         publisher = self._publisher(dataset_ref, DCT.publisher)
-        for key in ('uri', 'name', 'email', 'url', 'type'):
+        for key in ('uri', 'name', 'email', 'url', 'type', 'identifier'):
             if publisher.get(key):
                 dataset_dict['extras'].append(
                     {'key': 'publisher_{0}'.format(key),
@@ -1218,16 +1286,28 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('frequency', DCT.accrualPeriodicity, None, URIRefOrLiteral),
             ('access_rights', DCT.accessRights, None, URIRefOrLiteral),
             ('dcat_type', DCT.type, None, Literal),
-            ('provenance', DCT.provenance, None, Literal),
+            ('provenance', RDFS.label, None, Literal),
         ]
         self._add_triples_from_dict(dataset_dict, dataset_ref, items)
 
         # Tags
-        for tag in dataset_dict.get('tags', []):
-            g.add((dataset_ref, DCAT.keyword, Literal(tag['name'])))
+        # Pre-process keywords inside INSPIRE MD Codelists and update dataset_dict
+        dataset_tag_base = f"{dataset_ref.split('/dataset/')[0]}"
+        tag_names = [tag['name'].replace(" ", "").lower() for tag in dataset_dict.get('tags', [])]
+
+        # Search for matching keywords in MD_INSPIRE_REGISTER and update dataset_dict
+        for tag_name in tag_names:
+            mask = MD_INSPIRE_REGISTER.loc[MD_INSPIRE_REGISTER[['id', 'label']].apply(lambda x: x.str.contains(tag_name, case=False)).any(axis=1)]
+            if not mask.empty:
+                tag_val = mask['id'].iloc[0]
+            else:
+                tag_val = f'{dataset_tag_base}/dataset/?tags={tag_name}'
+            g.add((dataset_ref, DCAT.keyword, URIRefOrLiteral(tag_val)))
+
 
         # Dates
         items = [
+            ('created', DCT.created, ['metadata_created'], Literal),
             ('issued', DCT.issued, ['metadata_created'], Literal),
             ('modified', DCT.modified, ['metadata_modified'], Literal),
         ]
@@ -1237,26 +1317,44 @@ class EuropeanDCATAPProfile(RDFProfile):
         items = [
             ('language', DCT.language, None, URIRefOrLiteral),
             ('theme', DCAT.theme, None, URIRef),
+            (DCAT_THEME_NATIONAL, DCAT.theme, None, URIRef),
             ('conforms_to', DCT.conformsTo, None, Literal),
             ('alternate_identifier', ADMS.identifier, None, URIRefOrLiteral),
+            ('inspire_id', ADMS.identifier, None, URIRefOrLiteral),
             ('documentation', FOAF.page, None, URIRefOrLiteral),
             ('related_resource', DCT.relation, None, URIRefOrLiteral),
             ('has_version', DCT.hasVersion, None, URIRefOrLiteral),
             ('is_version_of', DCT.isVersionOf, None, URIRefOrLiteral),
+            ('lineage_source', DCT.source, None, URIRefOrLiteral),
             ('source', DCT.source, None, URIRefOrLiteral),
             ('sample', ADMS.sample, None, URIRefOrLiteral),
         ]
         self._add_list_triples_from_dict(dataset_dict, dataset_ref, items)
+
+        # DCAT Themes (https://publications.europa.eu/resource/authority/data-theme)
+        themes_dataset = set()
+        for theme in self._object_value_list(dataset_ref, DCAT.theme):
+            if "datos.gob.es" in theme:
+                theme = theme.replace('https://', 'http://')
+                themes_dataset.add(theme)
+                try:
+                    theme_mask = MD_THEME_NATIONAL.loc[MD_THEME_NATIONAL['id'].str.contains(theme, case=False)]
+                    if theme_mask['dcat_ap'].values[0]:
+                        themes_dataset.add(theme_mask['dcat_ap'].values[0])
+                except IndexError:
+                    themes_dataset.append(theme)
+
+        # Append the final result to the graph
+        for theme in themes_dataset:
+            g.add((dataset_ref, DCAT.theme, URIRefOrLiteral(theme)))
+
 
         # Contact details
         if any([
             self._get_dataset_value(dataset_dict, 'contact_uri'),
             self._get_dataset_value(dataset_dict, 'contact_name'),
             self._get_dataset_value(dataset_dict, 'contact_email'),
-            self._get_dataset_value(dataset_dict, 'maintainer'),
-            self._get_dataset_value(dataset_dict, 'maintainer_email'),
-            self._get_dataset_value(dataset_dict, 'author'),
-            self._get_dataset_value(dataset_dict, 'author_email'),
+            self._get_dataset_value(dataset_dict, 'contact_url'),
         ]):
 
             contact_uri = self._get_dataset_value(dataset_dict, 'contact_uri')
@@ -1268,17 +1366,105 @@ class EuropeanDCATAPProfile(RDFProfile):
             g.add((contact_details, RDF.type, VCARD.Organization))
             g.add((dataset_ref, DCAT.contactPoint, contact_details))
 
+            # Add name
             self._add_triple_from_dict(
                 dataset_dict, contact_details,
-                VCARD.fn, 'contact_name', ['maintainer', 'author']
+                VCARD.fn, 'contact_name'
             )
             # Add mail address as URIRef, and ensure it has a mailto: prefix
             self._add_triple_from_dict(
                 dataset_dict, contact_details,
-                VCARD.hasEmail, 'contact_email', ['maintainer_email',
-                                                  'author_email'],
+                VCARD.hasEmail, 'contact_email',
                 _type=URIRef, value_modifier=self._add_mailto
             )
+            # Add contact URL
+            self._add_triple_from_dict(
+                dataset_dict, contact_details,
+                VCARD.hasURL, 'contact_url',
+                _type=URIRef)
+            
+            # Add contact role
+            g.add((contact_details, VCARD.role, URIRef("https://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/pointOfContact")))
+
+        # Resource maintainer/contact 
+        if any([
+            self._get_dataset_value(dataset_dict, 'maintainer'),
+            self._get_dataset_value(dataset_dict, 'maintainer_uri'),
+            self._get_dataset_value(dataset_dict, 'maintainer_email'),
+            self._get_dataset_value(dataset_dict, 'maintainer_url'),
+        ]):
+            maintainer_uri = self._get_dataset_value(dataset_dict, 'maintainer_uri')
+            if maintainer_uri:
+                maintainer_details = CleanedURIRef(maintainer_uri)
+            else:
+                maintainer_details = dataset_ref + '/maintainer'
+                
+            g.add((maintainer_details, RDF.type, VCARD.Individual))
+            g.add((dataset_ref, DCAT.contactPoint, maintainer_details))
+
+            ## Add name & mail
+            self._add_triple_from_dict(
+                dataset_dict, maintainer_details,
+                VCARD.fn, 'maintainer'
+            )
+            self._add_triple_from_dict(
+                dataset_dict, maintainer_details,
+                VCARD.hasEmail, 'maintainer_email',
+                _type=URIRef, value_modifier=self._add_mailto
+            )
+
+            # Add maintainer URL
+            self._add_triple_from_dict(
+                dataset_dict, maintainer_details,
+                VCARD.hasURL, 'maintainer_url',
+                _type=URIRef)
+
+            # Add maintainer role
+            g.add((maintainer_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/custodian")))
+
+        # Resource author
+        if any([
+            self._get_dataset_value(dataset_dict, 'author'),
+            self._get_dataset_value(dataset_dict, 'author_uri'),
+            self._get_dataset_value(dataset_dict, 'author_email'),
+            self._get_dataset_value(dataset_dict, 'author_url'),
+        ]):
+            author_uri = self._get_dataset_value(dataset_dict, 'author_uri')
+            if author_uri:
+                author_details = CleanedURIRef(author_uri)
+            else:
+                author_details = dataset_ref + '/author'
+                
+            g.add((author_details, RDF.type, VCARD.Organization))
+            g.add((dataset_ref, DCT.creator, author_details))
+
+            ## Add name & mail
+            self._add_triple_from_dict(
+                dataset_dict, author_details,
+                VCARD.fn, 'author'
+            )
+            self._add_triple_from_dict(
+                dataset_dict, author_details,
+                VCARD.hasEmail, 'author_email',
+                _type=URIRef, value_modifier=self._add_mailto
+            )
+
+            # Add author URL
+            self._add_triple_from_dict(
+                dataset_dict, author_details,
+                VCARD.hasURL, 'author_url',
+                _type=URIRef)
+
+            # Add author role
+            g.add((author_details, VCARD.role, URIRef("https://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/author")))
+
+        # Provenance: dataset dct:provenance dct:ProvenanceStatement
+        provenance_details = dataset_ref + '/provenance'
+        provenance_statement = self._get_dataset_value(dataset_dict, 'provenance')
+        if provenance_statement:
+            g.add((dataset_ref, DCT.provenance, provenance_details))
+            g.add((provenance_details, RDF.type, DCT.ProvenanceStatement))
+            g.add((provenance_details, RDFS.label, Literal(provenance_statement)))
 
         # Publisher
         if any([
@@ -1317,11 +1503,17 @@ class EuropeanDCATAPProfile(RDFProfile):
                 ('publisher_email', FOAF.mbox, None, Literal),
                 ('publisher_url', FOAF.homepage, None, URIRef),
                 ('publisher_type', DCT.type, None, URIRefOrLiteral),
+                ('publisher_identifier', DCT.identifier, None, URIRefOrLiteral)
             ]
+
+            # Add publisher role
+            g.add((publisher_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/distributor")))
 
             self._add_triples_from_dict(dataset_dict, publisher_details, items)
 
+        # TODO: Deprecated: https://semiceu.github.io/GeoDCAT-AP/drafts/latest/#deprecated-properties-for-period-of-time
         # Temporal
+        '''        
         start = self._get_dataset_value(dataset_dict, 'temporal_start')
         end = self._get_dataset_value(dataset_dict, 'temporal_end')
         if start or end:
@@ -1333,6 +1525,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             if end:
                 self._add_date_triple(temporal_extent, SCHEMA.endDate, end)
             g.add((dataset_ref, DCT.temporal, temporal_extent))
+        '''
 
         # Spatial
         spatial_text = self._get_dataset_value(dataset_dict, 'spatial_text')
@@ -1396,24 +1589,38 @@ class EuropeanDCATAPProfile(RDFProfile):
             # IANA media types (either URI or Literal) should be mapped as mediaType.
             # In case format is available and mimetype is not set or identical to format,
             # check which type is appropriate.
+            '''
             if fmt and (not mimetype or mimetype == fmt):
                 if ('iana.org/assignments/media-types' in fmt
                         or not fmt.startswith('http') and '/' in fmt):
-                    # output format value as dcat:mediaType instead of dct:format
+                    # output format value as dct:format (https://publications.europa.eu/resource/authority/file-type)
                     mimetype = fmt
                     fmt = None
                 else:
                     # Use dct:format
                     mimetype = None
+            '''
 
             if mimetype:
                 g.add((distribution, DCAT.mediaType,
                        URIRefOrLiteral(mimetype)))
 
-            if fmt:
-                g.add((distribution, DCT['format'],
-                       URIRefOrLiteral(fmt)))
+            # Try to match format field
+            try:
+                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.fullmatch(fmt.replace(" ", ""), case=False)]
+                fmt_val = mask['id'].values[0]
+                mime_val = mask['media_type'].values[0] if not pd.isna(mask['media_type'].values[0]) else mimetype
+            except IndexError:
+                # Try to match using contains instead of fullmatch
+                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.contains(fmt.replace(" ", ""), case=True)]
+                fmt_val = mask['id'].values[0] if not mask.empty else fmt
+                mime_val = mask['media_type'].values[0] if not mask.empty and not pd.isna(mask['media_type'].values[0]) else mimetype
 
+            # Add format and media type to graph
+            if fmt_val:
+                g.add((distribution, DCT['format'], URIRefOrLiteral(fmt_val)))
+            if mime_val:
+                g.add((distribution, DCAT.mediaType, URIRefOrLiteral(mime_val)))
 
             # URL fallback and old behavior
             url = resource_dict.get('url')
@@ -1426,8 +1633,8 @@ class EuropeanDCATAPProfile(RDFProfile):
 
             # Dates
             items = [
-                ('issued', DCT.issued, ['created'], Literal),
-                ('modified', DCT.modified, ['metadata_modified'], Literal),
+                ('issued', DCT.issued, None, Literal),
+                ('modified', DCT.modified, None, Literal),
             ]
 
             self._add_date_triples_from_dict(resource_dict, distribution, items)
@@ -1705,6 +1912,7 @@ class SchemaOrgProfile(RDFProfile):
             ('title', SCHEMA.name, None, Literal),
             ('notes', SCHEMA.description, None, Literal),
             ('version', SCHEMA.version, ['dcat_version'], Literal),
+            ('created', SCHEMA.dateCreated, ['metadata_created'], Literal),
             ('issued', SCHEMA.datePublished, ['metadata_created'], Literal),
             ('modified', SCHEMA.dateModified, ['metadata_modified'], Literal),
             ('license', SCHEMA.license, ['license_url', 'license_title'], Literal),
@@ -1712,6 +1920,7 @@ class SchemaOrgProfile(RDFProfile):
         self._add_triples_from_dict(dataset_dict, dataset_ref, items)
 
         items = [
+            ('created', SCHEMA.dateCreated, ['metadata_created'], Literal),
             ('issued', SCHEMA.datePublished, ['metadata_created'], Literal),
             ('modified', SCHEMA.dateModified, ['metadata_modified'], Literal),
         ]
@@ -1749,7 +1958,7 @@ class SchemaOrgProfile(RDFProfile):
 
     def _tags_graph(self, dataset_ref, dataset_dict):
         for tag in dataset_dict.get('tags', []):
-            self.g.add((dataset_ref, SCHEMA.keywords, Literal(tag['name'])))
+            self.g.add((dataset_ref, SCHEMA.keywords, URIRefOrLiteral(tag['name'])))
 
     def _list_fields_graph(self, dataset_ref, dataset_dict):
         items = [
