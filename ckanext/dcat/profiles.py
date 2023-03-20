@@ -1287,6 +1287,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('access_rights', DCT.accessRights, None, URIRefOrLiteral),
             ('dcat_type', DCT.type, None, Literal),
             ('provenance', RDFS.label, None, Literal),
+            ('topic', DCAT.keyword, None, URIRefOrLiteral),
         ]
         self._add_triples_from_dict(dataset_dict, dataset_ref, items)
 
@@ -1297,12 +1298,13 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         # Search for matching keywords in MD_INSPIRE_REGISTER and update dataset_dict
         for tag_name in tag_names:
-            mask = MD_INSPIRE_REGISTER.loc[MD_INSPIRE_REGISTER[['id', 'label']].apply(lambda x: x.str.contains(tag_name, case=False)).any(axis=1)]
-            if not mask.empty:
-                tag_val = mask['id'].iloc[0]
-            else:
-                tag_val = f'{dataset_tag_base}/dataset/?tags={tag_name}'
-            g.add((dataset_ref, DCAT.keyword, URIRefOrLiteral(tag_val)))
+            if tag_name not in self._get_dataset_value(dataset_dict, 'topic'):
+                mask = MD_INSPIRE_REGISTER.loc[MD_INSPIRE_REGISTER[['id', 'label']].apply(lambda x: x.str.contains(tag_name, case=False)).any(axis=1)]
+                if not mask.empty:
+                    tag_val = mask['id'].iloc[0]
+                else:
+                    tag_val = f'{dataset_tag_base}/dataset/?tags={tag_name}'
+                g.add((dataset_ref, DCAT.keyword, URIRefOrLiteral(tag_val)))
 
 
         # Dates
