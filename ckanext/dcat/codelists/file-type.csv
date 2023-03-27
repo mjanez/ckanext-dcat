@@ -84,6 +84,7 @@ LZIP|http://publications.europa.eu/resource/authority/file-type/LZIP||LZIP|.lz
 LZMA|http://publications.europa.eu/resource/authority/file-type/LZMA||LZMA|.lzma
 LZO|http://publications.europa.eu/resource/authority/file-type/LZO||LZO|.lzo
 MAP_PRVW|http://publications.europa.eu/resource/authority/file-type/MAP_PRVW||MAP_PRVW|-
+MAP|http://publications.europa.eu/resource/authority/file-type/MAP_SRVC||MAP_SRVC|-
 MAP_SRVC|http://publications.europa.eu/resource/authority/file-type/MAP_SRVC||MAP_SRVC|-
 MBOX|http://publications.europa.eu/resource/authority/file-type/MBOX|https://www.iana.org/assignments/media-types/application/mbox|MBOX|.mbox
 MDB|http://publications.europa.eu/resource/authority/file-type/MDB||MDB|.mdb
@@ -170,6 +171,7 @@ TAR_XZ|http://publications.europa.eu/resource/authority/file-type/TAR_XZ||TAR_XZ
 TIFF|http://publications.europa.eu/resource/authority/file-type/TIFF|https://www.iana.org/assignments/media-types/image/tiff|TIFF|.tiff
 TIFF_FX|http://publications.europa.eu/resource/authority/file-type/TIFF_FX||TIFF_FX|.tiff
 TMX|http://publications.europa.eu/resource/authority/file-type/TMX||TMX|.xml
+TTL|http://publications.europa.eu/resource/authority/file-type/RDF_TURTLE|https://www.iana.org/assignments/media-types/text/turtle|RDF_TURTLE|.ttl
 TSV|http://publications.europa.eu/resource/authority/file-type/TSV|https://www.iana.org/assignments/media-types/text/tab-separated-values|TSV|.tsv
 TXT|http://publications.europa.eu/resource/authority/file-type/TXT||TXT|.txt
 UNGEN|http://publications.europa.eu/resource/authority/file-type/UNGEN||UNGEN|-
@@ -177,11 +179,16 @@ WAR|http://publications.europa.eu/resource/authority/file-type/WAR||WAR|.war
 WARC|http://publications.europa.eu/resource/authority/file-type/WARC||WARC|.warc
 WARC_GZ|http://publications.europa.eu/resource/authority/file-type/WARC_GZ||WARC_GZ|.warc.gz
 WAV|http://publications.europa.eu/resource/authority/file-type/WAV||WAV|.wav
+WCS|http://publications.europa.eu/resource/authority/file-type/WCS_SRVC||WCS_SRVC|-
 WCS_SRVC|http://publications.europa.eu/resource/authority/file-type/WCS_SRVC||WCS_SRVC|-
 WEBP|http://publications.europa.eu/resource/authority/file-type/WEBP||WEBP|.webp
+WFS|http://publications.europa.eu/resource/authority/file-type/WFS_SRVC||WFS_SRVC|-
 WFS_SRVC|http://publications.europa.eu/resource/authority/file-type/WFS_SRVC||WFS_SRVC|-
 WIM|http://publications.europa.eu/resource/authority/file-type/WIM||WIM|.swm
+WMS|http://publications.europa.eu/resource/authority/file-type/WMS_SRVC||WMS_SRVC|-
 WMS_SRVC|http://publications.europa.eu/resource/authority/file-type/WMS_SRVC||WMS_SRVC|-
+WMTS|http://publications.europa.eu/resource/authority/file-type/WMTS_SRVC||WMTS_SRVC|-
+WMTS_SRVC|http://publications.europa.eu/resource/authority/file-type/WMTS_SRVC||WMTS_SRVC|-
 WORLD|http://publications.europa.eu/resource/authority/file-type/WORLD||WORLD|.jgw
 XHTML|http://publications.europa.eu/resource/authority/file-type/XHTML||XHTML|.html
 XHTML_SIMPL|http://publications.europa.eu/resource/authority/file-type/XHTML_SIMPL||XHTML_SIMPL|.html
