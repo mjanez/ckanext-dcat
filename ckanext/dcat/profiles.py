@@ -1542,7 +1542,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 self._add_spatial_value_to_graph(spatial_ref, LOCN.geometry, spatial_geom)
 
         # Coordinate Reference System
-        if self.get_dataset_value(dataset_dict, 'reference_system'):
+        if self._get_dataset_value(dataset_dict, 'reference_system'):
             crs_uri = self._get_dataset_value(dataset_dict, 'reference_system')
             crs_details = CleanedURIRef(crs_uri)
             g.add((crs_details, RDF.type, DCT.Standard))
