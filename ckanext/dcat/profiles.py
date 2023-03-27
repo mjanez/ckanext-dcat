@@ -1306,7 +1306,6 @@ class EuropeanDCATAPProfile(RDFProfile):
                     tag_val = f'{dataset_tag_base}/dataset/?tags={tag_name}'
                 g.add((dataset_ref, DCAT.keyword, URIRefOrLiteral(tag_val)))
 
-
         # Dates
         items = [
             ('created', DCT.created, ['metadata_created'], Literal),
@@ -1541,6 +1540,14 @@ class EuropeanDCATAPProfile(RDFProfile):
 
             if spatial_geom:
                 self._add_spatial_value_to_graph(spatial_ref, LOCN.geometry, spatial_geom)
+
+        # Coordinate Reference System
+        if self.get_dataset_value(dataset_dict, 'reference_system'):
+            crs_uri = self._get_dataset_value(dataset_dict, 'reference_system')
+            crs_details = CleanedURIRef(crs_uri)
+            g.add((crs_details, RDF.type, DCT.Standard))
+            g.add((crs_details, DCT.type, CleanedURIRef('http://inspire.ec.europa.eu/glossary/SpatialReferenceSystem')))
+            g.add((dataset_ref, DCT.conformsTo, crs_details))
 
         # Use fallback license if set in config
         resource_license_fallback = None
