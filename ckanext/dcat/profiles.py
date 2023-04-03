@@ -38,6 +38,7 @@ LOCN = Namespace('http://www.w3.org/ns/locn#')
 GSP = Namespace('http://www.opengis.net/ont/geosparql#')
 OWL = Namespace('http://www.w3.org/2002/07/owl#')
 SPDX = Namespace('http://spdx.org/rdf/terms#')
+CNT = Namespace('http://www.w3.org/2011/content#')
 
 GEOJSON_IMT = 'https://www.iana.org/assignments/media-types/application/vnd.geo+json'
 CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
@@ -75,6 +76,7 @@ namespaces = {
     'locn': LOCN,
     'gsp': GSP,
     'owl': OWL,
+    'cnt': CNT,
     'spdx': SPDX,
 }
 
@@ -1060,6 +1062,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 ('notes', DCT.description),
                 ('url', DCAT.landingPage),
                 ('version', OWL.versionInfo),
+                ('encoding', CNT.characterEncoding)
                 ):
             value = self._object_value(dataset_ref, predicate)
             if value:
@@ -1102,6 +1105,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 ('alternate_identifer', ADMS.identifier),
                 ('inspire_id', ADMS.identifier),
                 ('conforms_to', DCT.conformsTo),
+                ('metadata_profile', DCT.conformsTo),
                 ('documentation', FOAF.page),
                 ('related_resource', DCT.relation),
                 ('has_version', DCT.hasVersion),
@@ -1201,6 +1205,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                     ('language', DCT.language),
                     ('documentation', FOAF.page),
                     ('conforms_to', DCT.conformsTo),
+                    ('metadata_profile', DCT.conformsTo),
                     ):
                 values = self._object_value_list(distribution, predicate)
                 if values:
@@ -1278,6 +1283,7 @@ class EuropeanDCATAPProfile(RDFProfile):
         # Basic fields
         items = [
             ('title', DCT.title, None, Literal),
+            ('encoding', CNT.characterEncoding, None, Literal),
             ('notes', DCT.description, None, Literal),
             ('url', DCAT.landingPage, None, URIRef),
             ('identifier', DCT.identifier, ['guid', 'id'], URIRefOrLiteral),
@@ -1319,7 +1325,8 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('language', DCT.language, None, URIRefOrLiteral),
             ('theme', DCAT.theme, None, URIRef),
             (DCAT_THEME_NATIONAL, DCAT.theme, None, URIRef),
-            ('conforms_to', DCT.conformsTo, None, Literal),
+            ('conforms_to', DCT.conformsTo, None, URIRef),
+            ('metadata_profile', DCT.conformsTo, None, URIRef),
             ('alternate_identifier', ADMS.identifier, None, URIRefOrLiteral),
             ('inspire_id', ADMS.identifier, None, URIRefOrLiteral),
             ('documentation', FOAF.page, None, URIRefOrLiteral),
@@ -1569,6 +1576,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             #  Simple values
             items = [
                 ('name', DCT.title, None, Literal),
+                ('encoding', CNT.characterEncoding, None, Literal),
                 ('description', DCT.description, None, Literal),
                 ('status', ADMS.status, None, URIRefOrLiteral),
                 ('rights', DCT.rights, None, URIRefOrLiteral),
@@ -1583,7 +1591,8 @@ class EuropeanDCATAPProfile(RDFProfile):
             items = [
                 ('documentation', FOAF.page, None, URIRefOrLiteral),
                 ('language', DCT.language, None, URIRefOrLiteral),
-                ('conforms_to', DCT.conformsTo, None, Literal),
+                ('conforms_to', DCT.conformsTo, None, URIRef),
+                ('metadata_profile', DCT.conformsTo, None, URIRef),
             ]
             self._add_list_triples_from_dict(resource_dict, distribution, items)
 
@@ -1615,15 +1624,21 @@ class EuropeanDCATAPProfile(RDFProfile):
                        URIRefOrLiteral(mimetype)))
 
             # Try to match format field
-            try:
-                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.fullmatch(fmt.replace(" ", ""), case=False)]
+            fmt = fmt.replace(" ", "")
+            mask = MD_FORMAT.loc[MD_FORMAT['label'].str.fullmatch(fmt, case=False)]
+
+            if not mask.empty:
                 fmt_val = mask['id'].values[0]
                 mime_val = mask['media_type'].values[0] if not pd.isna(mask['media_type'].values[0]) else mimetype
-            except IndexError:
+            else:
                 # Try to match using contains instead of fullmatch
-                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.contains(fmt.replace(" ", ""), case=True)]
-                fmt_val = mask['id'].values[0] if not mask.empty else fmt
-                mime_val = mask['media_type'].values[0] if not mask.empty and not pd.isna(mask['media_type'].values[0]) else mimetype
+                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.contains(fmt, case=True)]
+                if not mask.empty:
+                    fmt_val = mask['id'].values[0]
+                    mime_val = mask['media_type'].values[0] if not pd.isna(mask['media_type'].values[0]) else mimetype
+                else:
+                    fmt_val = fmt
+                    mime_val = mimetype
 
             # Add format and media type to graph
             if fmt_val:
@@ -1683,6 +1698,7 @@ class EuropeanDCATAPProfile(RDFProfile):
         # Basic fields
         items = [
             ('title', DCT.title, config.get('ckan.site_title'), Literal),
+            ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
             ('language', DCT.language, config.get('ckan.locale_default', 'en'), URIRefOrLiteral),
