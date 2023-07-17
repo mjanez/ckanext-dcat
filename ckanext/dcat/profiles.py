@@ -23,6 +23,7 @@ from ckan.lib.munge import munge_tag
 from ckanext.dcat.urls import url_for
 from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS
 import os
+import re
 import pandas as pd
 from pathlib import Path
 
@@ -40,7 +41,7 @@ OWL = Namespace('http://www.w3.org/2002/07/owl#')
 SPDX = Namespace('http://spdx.org/rdf/terms#')
 CNT = Namespace('http://www.w3.org/2011/content#')
 
-GEOJSON_IMT = 'https://www.iana.org/assignments/media-types/application/vnd.geo+json'
+GEOJSON_IMT = 'http://www.iana.org/assignments/media-types/application/vnd.geo+json'
 CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
 
 # CKAN field_name for national DCAT theme URIs.
@@ -62,6 +63,7 @@ for file_path in codelist_paths:
 MD_INSPIRE_REGISTER = pd.concat(codelists_dfs.values(), axis=0, ignore_index=True)
 MD_FORMAT = codelists_dfs.get("file-type")
 MD_THEME_NATIONAL = codelists_dfs.get(DCAT_THEME_NATIONAL)
+MD_DCAT_AP_THEME = codelists_dfs.get("theme-dcat_ap")
 
 namespaces = {
     'dct': DCT,
@@ -196,12 +198,26 @@ class RDFProfile(object):
         '''
         Returns all DCAT themes on a particular dataset
         '''
-        themes = self._object_value_list(dataset_ref, DCAT.theme) or []
-        # Split theme with commas
-        themes_with_commas = [t for t in themes if ',' in t]
-        for theme in themes_with_commas:
-            themes.remove(theme)
-            themes.extend([t.strip() for t in theme.split(',')])
+        # Precompile regular expressions for faster matching
+        data_es_pattern = re.compile(r"https?://datos\.gob\.es/")
+        inspire_eu_pattern = re.compile(r"https?://inspire\.ec\.europa\.eu/theme")
+
+        themes = set()
+
+        for theme in self._object_value_list(dataset_ref, DCAT.theme):
+            theme = theme.replace('https://', 'http://')
+
+            if data_es_pattern.match(theme):
+                themes.add(theme)
+                theme_mask = MD_THEME_NATIONAL.loc[MD_THEME_NATIONAL['id'].str.contains(theme, case=False, na=False)]
+                if not theme_mask.empty and theme_mask['dcat_ap'].values[0]:
+                    themes.add(theme_mask['dcat_ap'].values[0])
+
+            elif inspire_eu_pattern.match(theme):
+                themes.add(theme)
+                theme_mask = MD_DCAT_AP_THEME.loc[MD_DCAT_AP_THEME['id'].str.contains(theme, case=False, na=False)]
+                if not theme_mask.empty and theme_mask['dcat_ap'].values[0]:
+                    themes.add(theme_mask['dcat_ap'].values[0])
 
         return themes
 
@@ -1160,11 +1176,6 @@ class EuropeanDCATAPProfile(RDFProfile):
                        else '')
         dataset_dict['extras'].append({'key': 'uri', 'value': dataset_uri})
 
-        # access_rights
-        access_rights = self._access_rights(dataset_ref, DCT.accessRights)
-        if access_rights:
-            dataset_dict['extras'].append({'key': 'access_rights', 'value': access_rights})
-
         # License
         if 'license_id' not in dataset_dict:
             dataset_dict['license_id'] = self._license(dataset_ref)
@@ -1290,13 +1301,19 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('version', OWL.versionInfo, ['dcat_version'], Literal),
             ('version_notes', ADMS.versionNotes, None, Literal),
             ('frequency', DCT.accrualPeriodicity, None, URIRefOrLiteral),
-            ('access_rights', DCT.accessRights, None, URIRefOrLiteral),
-            ('dcat_type', DCT.type, None, Literal),
+            ('dcat_type', DCT.type, None, URIRefOrLiteral),
             ('provenance', RDFS.label, None, Literal),
             ('topic', DCAT.keyword, None, URIRefOrLiteral),
         ]
         self._add_triples_from_dict(dataset_dict, dataset_ref, items)
 
+        # Access Rights
+        # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
+        if self._get_dataset_value(dataset_dict, 'access_rights'):
+            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/PUBLIC")))
+        else:
+            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/NON_PUBLIC")))
+           
         # Tags
         # Pre-process keywords inside INSPIRE MD Codelists and update dataset_dict
         dataset_tag_base = f"{dataset_ref.split('/dataset/')[0]}"
@@ -1340,22 +1357,10 @@ class EuropeanDCATAPProfile(RDFProfile):
         self._add_list_triples_from_dict(dataset_dict, dataset_ref, items)
 
         # DCAT Themes (https://publications.europa.eu/resource/authority/data-theme)
-        themes_dataset = set()
-        for theme in self._object_value_list(dataset_ref, DCAT.theme):
-            if "datos.gob.es" in theme:
-                theme = theme.replace('https://', 'http://')
-                themes_dataset.add(theme)
-                try:
-                    theme_mask = MD_THEME_NATIONAL.loc[MD_THEME_NATIONAL['id'].str.contains(theme, case=False)]
-                    if theme_mask['dcat_ap'].values[0]:
-                        themes_dataset.add(theme_mask['dcat_ap'].values[0])
-                except IndexError:
-                    themes_dataset.append(theme)
-
         # Append the final result to the graph
-        for theme in themes_dataset:
+        dcat_themes = self._themes(dataset_ref)
+        for theme in dcat_themes:
             g.add((dataset_ref, DCAT.theme, URIRefOrLiteral(theme)))
-
 
         # Contact details
         if any([
@@ -1392,7 +1397,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 _type=URIRef)
             
             # Add contact role
-            g.add((contact_details, VCARD.role, URIRef("https://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/pointOfContact")))
+            g.add((contact_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/pointOfContact")))
 
         # Resource maintainer/contact 
         if any([
@@ -1464,7 +1469,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 _type=URIRef)
 
             # Add author role
-            g.add((author_details, VCARD.role, URIRef("https://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/author")))
+            g.add((author_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/author")))
 
         # Provenance: dataset dct:provenance dct:ProvenanceStatement
         provenance_details = dataset_ref + '/provenance'
@@ -1643,7 +1648,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             # Add format and media type to graph
             if fmt_val:
                 g.add((distribution, DCT['format'], URIRefOrLiteral(fmt_val)))
-            if mime_val:
+            if mime_val and not mimetype:
                 g.add((distribution, DCAT.mediaType, URIRefOrLiteral(mime_val)))
 
             # URL fallback and old behavior
@@ -1702,7 +1707,9 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
             ('language', DCT.language, config.get('ckan.locale_default', 'en'), URIRefOrLiteral),
+            ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef)
         ]
+
         for item in items:
             key, predicate, fallback, _type = item
             if catalog_dict:
