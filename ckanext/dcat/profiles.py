@@ -70,6 +70,7 @@ for df in codelists_dfs.values():
 MD_FORMAT = codelists_dfs.get("file-type")
 MD_THEME_NATIONAL = codelists_dfs.get(DCAT_THEME_NATIONAL)
 MD_DCAT_AP_THEME = codelists_dfs.get("theme-dcat_ap")
+MD_EU_LANGUAGES = codelists_dfs.get("languages")
 
 namespaces = {
     'dct': DCT,
@@ -1710,6 +1711,8 @@ class EuropeanDCATAPProfile(RDFProfile):
             g.bind(prefix, namespace)
 
         g.add((catalog_ref, RDF.type, DCAT.Catalog))
+        
+        catalog_language = self._search_value_codelist(MD_EU_LANGUAGES, config.get('ckan.locale_default'), "label","id") or "http://publications.europa.eu/resource/authority/language/ENG"
 
         # Basic fields
         items = [
@@ -1717,8 +1720,9 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
-            ('language', DCT.language, config.get('ckan.locale_default', 'en'), URIRefOrLiteral),
-            ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef)
+            ('language', DCT.language, catalog_language, URIRefOrLiteral),
+            ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef),
+            ('publisher', DCT.publisher, config.get('ckan.site_url'), URIRef)
         ]
 
         for item in items:
