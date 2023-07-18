@@ -760,21 +760,24 @@ class RDFProfile(object):
                     items = [value]  # Normal text value
         return items
 
-    def _add_spatial_value_to_graph(self, spatial_ref, predicate, value):
+    def _add_geojson_value_to_graph(self, spatial_ref, predicate, value):
         '''
-        Adds spatial triples to the graph.
+        Adds GeoJSON spatial triples to the graph.
         '''
-        # GeoJSON
         self.g.add((spatial_ref,
-                predicate,
-                Literal(value, datatype=GEOJSON_IMT)))
-        # WKT, because GeoDCAT-AP says so
+                    predicate,
+                    Literal(value, datatype=GEOJSON_IMT)))
+
+    def _add_wkt_value_to_graph(self, spatial_ref, predicate, value):
+        '''
+        Adds WKT spatial triples to the graph.
+        '''
         try:
             self.g.add((spatial_ref,
-                    predicate,
-                    Literal(wkt.dumps(json.loads(value),
-                                        decimals=4),
-                            datatype=GSP.wktLiteral)))
+                        predicate,
+                        Literal(wkt.dumps(json.loads(value),
+                                            decimals=4),
+                                datatype=GSP.wktLiteral)))
         except (TypeError, ValueError, InvalidGeoJSONException):
             pass
 
@@ -1550,8 +1553,9 @@ class EuropeanDCATAPProfile(RDFProfile):
             if spatial_text:
                 g.add((spatial_ref, SKOS.prefLabel, Literal(spatial_text)))
 
-            if spatial_geom:
-                self._add_spatial_value_to_graph(spatial_ref, LOCN.geometry, spatial_geom)
+            # Deprecated by dcat:bbox
+            # if spatial_geom:
+            #     self._add_spatial_value_to_graph(spatial_ref, LOCN.geometry, spatial_geom)
 
         # Coordinate Reference System
         if self._get_dataset_value(dataset_dict, 'reference_system'):
@@ -1813,17 +1817,18 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
             self.g.add((dataset_ref, DCT.temporal, temporal_extent_dcat))
 
         # spatial
-        spatial_bbox = self._get_dataset_value(dataset_dict, 'spatial_bbox')
+        spatial_bbox = self._get_dataset_value(dataset_dict, 'spatial_bbox') or self._get_dataset_value(dataset_dict, 'spatial')
         spatial_cent = self._get_dataset_value(dataset_dict, 'spatial_centroid')
 
         if spatial_bbox or spatial_cent:
             spatial_ref = self._get_or_create_spatial_ref(dataset_dict, dataset_ref)
 
+            # _add_wkt_value_to_graph to comply with GeoDCAT-AP: Geometries MAY be provided in multiple encodings, but at least one of the following MUST be made available: GML and WKT.(https://semiceu.github.io/GeoDCAT-AP/drafts/latest/#bounding-box)
             if spatial_bbox:
-                self._add_spatial_value_to_graph(spatial_ref, DCAT.bbox, spatial_bbox)
+                self._add_wkt_value_to_graph(spatial_ref, DCAT.bbox, spatial_bbox)
 
             if spatial_cent:
-                self._add_spatial_value_to_graph(spatial_ref, DCAT.centroid, spatial_cent)
+                self._add_wkt_value_to_graph(spatial_ref, DCAT.centroid, spatial_cent)
 
         # Spatial resolution in meters
         spatial_resolution_in_meters = self._read_list_value(
