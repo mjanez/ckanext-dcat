@@ -1,4 +1,4 @@
-ID|Language|label|definition|description|collection|parent|successor|predecessor|registry|register|ReferenceSource|ReferenceLink|governance-level-item|LegislationURI|LegislationLabel|EIONETURI|EIONETLabel|status
-http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/availability|es|Disponibilidad |Describe el porcentaje de tiempo durante el que está disponible el servicio.||http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria||||||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
-http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/performance|es|Rendimiento|Describe la rapidez con la que puede atenderse una petición al servicio de datos espaciales.||http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria||||||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
-http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/capacity|es|Capacidad|Describe el número máximo de peticiones simultáneas que pueden atenderse con el rendimiento declarado.||http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria||||||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
+id,label
+http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/availability,availability
+http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/performance,performance
+http://inspire.ec.europa.eu/metadata-codelist/QualityOfServiceCriteria/capacity,capacity

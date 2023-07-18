@@ -24,7 +24,7 @@ from ckanext.dcat.urls import url_for
 from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS
 import os
 import re
-import pandas as pd
+import csv
 from pathlib import Path
 
 DCT = Namespace("http://purl.org/dc/terms/")
@@ -52,15 +52,21 @@ codelist_paths = [os.path.join(CODELISTS_DIR, f) for f in os.listdir(CODELISTS_D
 codelists_dfs = {}
 
 # Iterate over file paths and read in data
+codelists_dfs = {}
 for file_path in codelist_paths:
     with open(file_path, "r") as f:
-        df = pd.read_csv(f, index_col=None, header=0, delimiter="|", dtype=str)
-        df.columns = df.columns.str.lower()
+        reader = csv.reader(f, delimiter=",")
+        header = next(reader)
+        df = []
+        for row in reader:
+            df.append(dict(zip(header, row)))
         file_name = os.path.splitext(os.path.basename(file_path))[0].lower()
         codelists_dfs[file_name] = df
 
 # INSPIRE Codelists
-MD_INSPIRE_REGISTER = pd.concat(codelists_dfs.values(), axis=0, ignore_index=True)
+MD_INSPIRE_REGISTER = []
+for df in codelists_dfs.values():
+    MD_INSPIRE_REGISTER += df
 MD_FORMAT = codelists_dfs.get("file-type")
 MD_THEME_NATIONAL = codelists_dfs.get(DCAT_THEME_NATIONAL)
 MD_DCAT_AP_THEME = codelists_dfs.get("theme-dcat_ap")
@@ -209,15 +215,16 @@ class RDFProfile(object):
 
             if data_es_pattern.match(theme):
                 themes.add(theme)
-                theme_mask = MD_THEME_NATIONAL.loc[MD_THEME_NATIONAL['id'].str.contains(theme, case=False, na=False)]
-                if not theme_mask.empty and theme_mask['dcat_ap'].values[0]:
-                    themes.add(theme_mask['dcat_ap'].values[0])
-
+                if theme:
+                    theme_es_dcat_ap = self._search_value_codelist(MD_THEME_NATIONAL, theme, "id","dcat_ap") or None
+                    themes.add(theme_es_dcat_ap)
+                
             elif inspire_eu_pattern.match(theme):
                 themes.add(theme)
-                theme_mask = MD_DCAT_AP_THEME.loc[MD_DCAT_AP_THEME['id'].str.contains(theme, case=False, na=False)]
-                if not theme_mask.empty and theme_mask['dcat_ap'].values[0]:
-                    themes.add(theme_mask['dcat_ap'].values[0])
+                if theme:
+                    theme_eu_dcat_ap = self._search_value_codelist(MD_DCAT_AP_THEME, theme, "id","dcat_ap") or None
+                    themes.add(theme_eu_dcat_ap)
+                    
 
         return themes
 
@@ -550,6 +557,37 @@ class RDFProfile(object):
         return cur_value
 
 
+    def _search_values_codelist_add_to_graph(self, metadata_codelist, labels, dataset_dict, dataset_ref, dataset_tag_base, g, dcat_property):
+        # Create a dictionary with label as key and id as value for each element in metadata_codelist
+        inspire_dict = {row['label'].lower(): row['id'] for row in metadata_codelist}
+        
+        # Check if labels is a list, if not, convert it to a list
+        if not isinstance(labels, list):
+            labels = [labels]
+        
+        for label in labels:
+            if label not in self._get_dataset_value(dataset_dict, 'topic'):
+                # Check if tag_name is in inspire_dict
+                if label.lower() in inspire_dict:
+                    tag_val = inspire_dict[label.lower()]
+                else:
+                    tag_val = f'{dataset_tag_base}/dataset/?tags={label}'
+                g.add((dataset_ref, dcat_property, URIRefOrLiteral(tag_val)))
+
+    def _search_value_codelist(self, metadata_codelist, label, input_field_name, output_field_name):
+        # Create a dictionary with label as key and id as value for each element in metadata_codelist
+        tag_val = label
+        inspire_dict = {row[input_field_name].lower(): row[output_field_name] for row in metadata_codelist}
+                
+        # Check if tag_name is in inspire_dict
+        try:
+            if label.lower() in inspire_dict:
+                tag_val = inspire_dict[label.lower()]
+        except:
+            pass
+            
+        return tag_val
+
     def _spatial(self, subject, predicate):
         '''
         Returns a dict with details about the spatial location
@@ -559,8 +597,8 @@ class RDFProfile(object):
         Returns keys for uri, text or geom with the values set to
         None if they could not be found.
 
-        Geometries are always returned in GeoJSON. If only WKT is provided,
-        it will be transformed to GeoJSON.
+        Geometries are always returned in WKT. If only GeoJSON is provided,
+        it will be transformed to WKT.
 
         Check the notes on the README for the supported formats:
 
@@ -1323,14 +1361,8 @@ class EuropeanDCATAPProfile(RDFProfile):
         tag_names = [tag['name'].replace(" ", "").lower() for tag in dataset_dict.get('tags', [])]
 
         # Search for matching keywords in MD_INSPIRE_REGISTER and update dataset_dict
-        for tag_name in tag_names:
-            if tag_name not in self._get_dataset_value(dataset_dict, 'topic'):
-                mask = MD_INSPIRE_REGISTER.loc[MD_INSPIRE_REGISTER[['id', 'label']].apply(lambda x: x.str.contains(tag_name, case=False)).any(axis=1)]
-                if not mask.empty:
-                    tag_val = mask['id'].iloc[0]
-                else:
-                    tag_val = f'{dataset_tag_base}/dataset/?tags={tag_name}'
-                g.add((dataset_ref, DCAT.keyword, URIRefOrLiteral(tag_val)))
+        if tag_names:             
+            self._search_values_codelist_add_to_graph(MD_INSPIRE_REGISTER, tag_names, dataset_dict, dataset_ref, dataset_tag_base, g, DCAT.keyword)
 
         # Dates
         items = [
@@ -1611,49 +1643,24 @@ class EuropeanDCATAPProfile(RDFProfile):
 
             # Format
             mimetype = resource_dict.get('mimetype')
-            fmt = resource_dict.get('format')
+            fmt = resource_dict.get('format').replace(" ", "")
 
             # IANA media types (either URI or Literal) should be mapped as mediaType.
             # In case format is available and mimetype is not set or identical to format,
             # check which type is appropriate.
-            '''
-            if fmt and (not mimetype or mimetype == fmt):
-                if ('iana.org/assignments/media-types' in fmt
-                        or not fmt.startswith('http') and '/' in fmt):
-                    # output format value as dct:format (https://publications.europa.eu/resource/authority/file-type)
-                    mimetype = fmt
-                    fmt = None
-                else:
-                    # Use dct:format
-                    mimetype = None
-            '''
-
             if mimetype:
-                g.add((distribution, DCAT.mediaType,
-                       URIRefOrLiteral(mimetype)))
+                g.add((distribution, DCAT.mediaType, URIRefOrLiteral(mimetype)))
+            elif fmt:
+                mime_val = self._search_value_codelist(MD_FORMAT, fmt, "id", "media_type") or None
+                if mime_val and mime_val != fmt:
+                    g.add((distribution, DCAT.mediaType, URIRefOrLiteral(mime_val)))
 
             # Try to match format field
-            fmt = fmt.replace(" ", "")
-            mask = MD_FORMAT.loc[MD_FORMAT['label'].str.fullmatch(fmt, case=False)]
+            fmt = self._search_value_codelist(MD_FORMAT, fmt, "label", "id") or fmt
 
-            if not mask.empty:
-                fmt_val = mask['id'].values[0]
-                mime_val = mask['media_type'].values[0] if not pd.isna(mask['media_type'].values[0]) else mimetype
-            else:
-                # Try to match using contains instead of fullmatch
-                mask = MD_FORMAT.loc[MD_FORMAT['label'].str.contains(fmt, case=True)]
-                if not mask.empty:
-                    fmt_val = mask['id'].values[0]
-                    mime_val = mask['media_type'].values[0] if not pd.isna(mask['media_type'].values[0]) else mimetype
-                else:
-                    fmt_val = fmt
-                    mime_val = mimetype
-
-            # Add format and media type to graph
-            if fmt_val:
-                g.add((distribution, DCT['format'], URIRefOrLiteral(fmt_val)))
-            if mime_val and not mimetype:
-                g.add((distribution, DCAT.mediaType, URIRefOrLiteral(mime_val)))
+            # Add format to graph
+            if fmt:
+                g.add((distribution, DCT['format'], URIRefOrLiteral(fmt)))
 
             # URL fallback and old behavior
             url = resource_dict.get('url')

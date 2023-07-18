@@ -1,43 +1,23 @@
-id|dcat_ap|label|language
-http://inspire.ec.europa.eu/theme/ac|http://publications.europa.eu/resource/authority/data-theme/ENVI|Atmospheric Conditions (AC)|en
-http://inspire.ec.europa.eu/theme/ad|http://publications.europa.eu/resource/authority/data-theme/REGI|Addresses (AD)|en
-http://inspire.ec.europa.eu/theme/af|http://publications.europa.eu/resource/authority/data-theme/AGRI|Agricultural and Aquaculture Facilities (AF)|en
-http://inspire.ec.europa.eu/theme/am|http://publications.europa.eu/resource/authority/data-theme/ENVI|Area Management/Restriction/Regulation Zones and Reporting Units (AM)|en
-http://inspire.ec.europa.eu/theme/au|http://publications.europa.eu/resource/authority/data-theme/GOVE|Administrative units (SO)|en
-http://inspire.ec.europa.eu/theme/br|http://publications.europa.eu/resource/authority/data-theme/ENVI|Bio-geographical regions (BR)|en
-http://inspire.ec.europa.eu/theme/bu|http://publications.europa.eu/resource/authority/data-theme/REGI|Buildings (BU)|en
-http://inspire.ec.europa.eu/theme/cp|http://publications.europa.eu/resource/authority/data-theme/REGI|Cadastral parcels (CP)|en
-http://inspire.ec.europa.eu/theme/cp|http://publications.europa.eu/resource/authority/data-theme/ECON|Cadastral parcels (CP)|en
-http://inspire.ec.europa.eu/theme/ef|http://publications.europa.eu/resource/authority/data-theme/ENVI|Environmental Monitoring Facilities (EF)|en
-http://inspire.ec.europa.eu/theme/el|http://publications.europa.eu/resource/authority/data-theme/REGI|Elevations (EL)|en
-http://inspire.ec.europa.eu/theme/er|http://publications.europa.eu/resource/authority/data-theme/ENER|Natural resources (ER)|en
-http://inspire.ec.europa.eu/theme/ge|http://publications.europa.eu/resource/authority/data-theme/REGI|Geology (GE)|en
-http://inspire.ec.europa.eu/theme/ge|http://publications.europa.eu/resource/authority/data-theme/TECH|Geology (GE)|en
-http://inspire.ec.europa.eu/theme/gg|http://publications.europa.eu/resource/authority/data-theme/REGI|Geographical Grid Systems (GG)|en
-http://inspire.ec.europa.eu/theme/gn|http://publications.europa.eu/resource/authority/data-theme/REGI|Geographical names (GN)|en
-http://inspire.ec.europa.eu/theme/hb|http://publications.europa.eu/resource/authority/data-theme/ENVI|Habitats and Biotopes (HB)|en
-http://inspire.ec.europa.eu/theme/hh|http://publications.europa.eu/resource/authority/data-theme/HEAL|Human health and safety (HH)|en
-http://inspire.ec.europa.eu/theme/hy|http://publications.europa.eu/resource/authority/data-theme/ENVI|Hydrography (HY)|en
-http://inspire.ec.europa.eu/theme/hy|http://publications.europa.eu/resource/authority/data-theme/TECH|Hydrography (HY)|en
-http://inspire.ec.europa.eu/theme/lc|http://publications.europa.eu/resource/authority/data-theme/ENVI|Land Cover (LC)|en
-http://inspire.ec.europa.eu/theme/lu|http://publications.europa.eu/resource/authority/data-theme/ECON|Land use (LU)|en
-http://inspire.ec.europa.eu/theme/lu|http://publications.europa.eu/resource/authority/data-theme/ENVI|Land use (LU)|en
-http://inspire.ec.europa.eu/theme/mf|http://publications.europa.eu/resource/authority/data-theme/ENVI|Meteorological Geographical Features (MF)|en
-http://inspire.ec.europa.eu/theme/mf|http://publications.europa.eu/resource/authority/data-theme/TECH|Meteorological Geographical Features (MF)|en
-http://inspire.ec.europa.eu/theme/mr|http://publications.europa.eu/resource/authority/data-theme/ECON|Mineral resources (MR)|en
-http://inspire.ec.europa.eu/theme/mr|http://publications.europa.eu/resource/authority/data-theme/ENVI|Mineral resources (MR)|en
-http://inspire.ec.europa.eu/theme/mr|http://publications.europa.eu/resource/authority/data-theme/ENER|Mineral resources (MR)|en
-http://inspire.ec.europa.eu/theme/nz|http://publications.europa.eu/resource/authority/data-theme/ENVI|Natural risk zones (NZ)|en
-http://inspire.ec.europa.eu/theme/of|http://publications.europa.eu/resource/authority/data-theme/ENVI|Oceanographic Geographical Features (OF)|en
-http://inspire.ec.europa.eu/theme/oi|http://publications.europa.eu/resource/authority/data-theme/REGI|Orthoimagery (OI)|en
-http://inspire.ec.europa.eu/theme/oi|http://publications.europa.eu/resource/authority/data-theme/TECH|Orthoimagery (OI)|en
-http://inspire.ec.europa.eu/theme/pd|http://publications.europa.eu/resource/authority/data-theme/SOCI|Population distribution — demography (PD)|en
-http://inspire.ec.europa.eu/theme/pf|http://publications.europa.eu/resource/authority/data-theme/ECON|Production and Industrial Facilities (PF)|en
-http://inspire.ec.europa.eu/theme/ps|http://publications.europa.eu/resource/authority/data-theme/ENVI|Protected sites (PS)|en
-http://inspire.ec.europa.eu/theme/rs|http://publications.europa.eu/resource/authority/data-theme/REGI|Coordinate Reference Systems (RS)|en
-http://inspire.ec.europa.eu/theme/sd|http://publications.europa.eu/resource/authority/data-theme/ENVI|Species distribution (SD)|en
-http://inspire.ec.europa.eu/theme/so|http://publications.europa.eu/resource/authority/data-theme/ENVI|Soil (SO)|en
-http://inspire.ec.europa.eu/theme/sr|http://publications.europa.eu/resource/authority/data-theme/ENVI|Sea regions (BR)|en
-http://inspire.ec.europa.eu/theme/su|http://publications.europa.eu/resource/authority/data-theme/SOCI|Statistical units (SU)|en
-http://inspire.ec.europa.eu/theme/tn|http://publications.europa.eu/resource/authority/data-theme/TRAN|Transport networks (TN)|en
-http://inspire.ec.europa.eu/theme/us|http://publications.europa.eu/resource/authority/data-theme/GOVE|Utility and governmental services (US)|en
+id,label,dcat_ap
+http://datos.gob.es/kos/sector-publico/sector/ciencia-tecnologia,ciencia-tecnologia,http://publications.europa.eu/resource/authority/data-theme/TECH
+http://datos.gob.es/kos/sector-publico/sector/comercio,comercio,http://publications.europa.eu/resource/authority/data-theme/ECON
+http://datos.gob.es/kos/sector-publico/sector/cultura-ocio,cultura-ocio,http://publications.europa.eu/resource/authority/data-theme/EDUC
+http://datos.gob.es/kos/sector-publico/sector/demografia,demografia,http://publications.europa.eu/resource/authority/data-theme/SOCI
+http://datos.gob.es/kos/sector-publico/sector/deporte,deporte,http://publications.europa.eu/resource/authority/data-theme/EDUC
+http://datos.gob.es/kos/sector-publico/sector/economia,economia,http://publications.europa.eu/resource/authority/data-theme/ECON
+http://datos.gob.es/kos/sector-publico/sector/educacion,educacion,http://publications.europa.eu/resource/authority/data-theme/EDUC
+http://datos.gob.es/kos/sector-publico/sector/empleo,empleo,http://publications.europa.eu/resource/authority/data-theme/ECON
+http://datos.gob.es/kos/sector-publico/sector/energia,energia,http://publications.europa.eu/resource/authority/data-theme/ENER
+http://datos.gob.es/kos/sector-publico/sector/hacienda,hacienda,http://publications.europa.eu/resource/authority/data-theme/GOVE
+http://datos.gob.es/kos/sector-publico/sector/industria,industria,http://publications.europa.eu/resource/authority/data-theme/ECON
+http://datos.gob.es/kos/sector-publico/sector/legislacion-justicia,legislacion-justicia,http://publications.europa.eu/resource/authority/data-theme/JUST
+http://datos.gob.es/kos/sector-publico/sector/medio-ambiente,medio-ambiente,http://publications.europa.eu/resource/authority/data-theme/ENVI
+http://datos.gob.es/kos/sector-publico/sector/medio-rural-pesca,medio-rural-pesca,http://publications.europa.eu/resource/authority/data-theme/AGRI
+http://datos.gob.es/kos/sector-publico/sector/salud,salud,http://publications.europa.eu/resource/authority/data-theme/HEAL
+http://datos.gob.es/kos/sector-publico/sector/sector-publico,sector-publico,http://publications.europa.eu/resource/authority/data-theme/GOVE
+http://datos.gob.es/kos/sector-publico/sector/seguridad,seguridad,http://publications.europa.eu/resource/authority/data-theme/JUST
+http://datos.gob.es/kos/sector-publico/sector/sociedad-bienestar,sociedad-bienestar,http://publications.europa.eu/resource/authority/data-theme/SOCI
+http://datos.gob.es/kos/sector-publico/sector/transporte,transporte,http://publications.europa.eu/resource/authority/data-theme/TRAN
+http://datos.gob.es/kos/sector-publico/sector/turismo,turismo,http://publications.europa.eu/resource/authority/data-theme/ECON
+http://datos.gob.es/kos/sector-publico/sector/urbanismo-infraestructuras,urbanismo-infraestructuras,http://publications.europa.eu/resource/authority/data-theme/REGI
+http://datos.gob.es/kos/sector-publico/sector/vivienda,vivienda,http://publications.europa.eu/resource/authority/data-theme/REGI

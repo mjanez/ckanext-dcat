@@ -1,4 +1,4 @@
-ID|Language|label|definition|description|collection|parent|successor|predecessor|registry|register|ReferenceSource|ReferenceLink|governance-level-item|LegislationURI|LegislationLabel|EIONETURI|EIONETLabel|status
-http://inspire.ec.europa.eu/metadata-codelist/ResourceType/series|es|Serie de conjuntos de datos espaciales|||http://inspire.ec.europa.eu/metadata-codelist/ResourceType||||||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
-http://inspire.ec.europa.eu/metadata-codelist/ResourceType/dataset|es|Conjunto de datos espaciales|||http://inspire.ec.europa.eu/metadata-codelist/ResourceType||||||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
-http://inspire.ec.europa.eu/metadata-codelist/ResourceType/service|es|Servicio de datos espaciales|||http://inspire.ec.europa.eu/metadata-codelist/ResourceType|||http://inspire.ec.europa.eu/metadata-codelist/ResourceType/services|||||http://inspire.ec.europa.eu/registry/governance-level/eu-legal|||||http://inspire.ec.europa.eu/registry/status/valid
+id,label
+http://inspire.ec.europa.eu/metadata-codelist/ResourceType/series,series
+http://inspire.ec.europa.eu/metadata-codelist/ResourceType/dataset,dataset
+http://inspire.ec.europa.eu/metadata-codelist/ResourceType/service,service
