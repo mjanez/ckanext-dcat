@@ -1821,7 +1821,7 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
                                     ('serves_dataset', DCAT.servesDataset),
                                     ):
                                 values = self._object_value_list(access_service, predicate)
-                                if value:
+                                if values:
                                     access_service_dict[key] = values
 
                             # Access service URI (explicitly show the missing ones)
