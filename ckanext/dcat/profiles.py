@@ -805,6 +805,42 @@ class RDFProfile(object):
                     predicate,
                     Literal(value, datatype=GEOJSON_IMT)))
 
+    def _add_geojson_or_wkt_value_to_graph(self, spatial_ref, predicate, spatial_value):
+        """
+        Adds a GeoJSON or WKT value to an RDF graph.
+
+        Args:
+            spatial_ref: The RDF subject reference.
+            predicate: The RDF predicate for the spatial data.
+            spatial_value: The GeoJSON or GeoJSON string to be added.
+
+        Note:
+            This function attempts to add the value as WKT first and, if unsuccessful,
+            adds it as a GeoJSON literal.
+
+        Raises:
+            TypeError: If the input value is of an unsupported type.
+            ValueError: If there's an error in converting GeoJSON to WKT.
+            InvalidGeoJSONException: If the GeoJSON is invalid.
+        """
+        try:
+            if isinstance(spatial_value, str):
+                # Try to parse the input as a GeoJSON string
+                geojson_obj = json.loads(spatial_value)
+            else:
+                geojson_obj = spatial_value
+
+            # Attempt to convert the GeoJSON object to WKT with 4 decimals
+            wkt_string = wkt.dumps(geojson_obj, decimals=4)
+
+            # Create a Literal with the WKT representation and add it to the RDF graph
+            wkt_literal = Literal(wkt_string, datatype=GSP.wktLiteral)
+            self.g.add((spatial_ref, predicate, wkt_literal))
+        except (TypeError, ValueError, InvalidGeoJSONException):
+            # If WKT conversion fails, add the value as a GeoJSON literal
+            geojson_literal = Literal(spatial_value, datatype=GSP.geoJSONLiteral)
+            self.g.add((spatial_ref, predicate, geojson_literal))
+
     def _add_wkt_value_to_graph(self, spatial_ref, predicate, value):
         '''
         Adds WKT spatial triples to the graph.
@@ -1873,12 +1909,17 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
         if spatial_bbox or spatial_cent:
             spatial_ref = self._get_or_create_spatial_ref(dataset_dict, dataset_ref)
 
-            # _add_wkt_value_to_graph to comply with GeoDCAT-AP: Geometries MAY be provided in multiple encodings, but at least one of the following MUST be made available: GML and WKT.(https://semiceu.github.io/GeoDCAT-AP/drafts/latest/#bounding-box)
+            # _add_geojson_or_wkt_value_to_graph to comply with GeoDCAT-AP: Geometries MAY be provided in multiple encodings, but at least one of the following MUST be made available: GML and WKT.(https://semiceu.github.io/GeoDCAT-AP/drafts/latest/#bounding-box)
             if spatial_bbox:
-                self._add_wkt_value_to_graph(spatial_ref, DCAT.bbox, spatial_bbox)
-
+                try:
+                    self._add_geojson_or_wkt_value_to_graph(spatial_ref, DCAT.bbox, spatial_bbox)
+                except:
+                    self.g.add((spatial_ref, DCAT.bbox, Literal(spatial_bbox, datatype=GSP.geoJSONLiteral)))
             if spatial_cent:
-                self._add_wkt_value_to_graph(spatial_ref, DCAT.centroid, spatial_cent)
+                try:
+                    self._add_geojson_or_wkt_value_to_graph(spatial_ref, DCAT.bbox, spatial_cent)
+                except:
+                    self.g.add((spatial_ref, DCAT.bbox, Literal(spatial_cent, datatype=GSP.geoJSONLiteral)))
 
         # Spatial resolution in meters
         spatial_resolution_in_meters = self._read_list_value(
