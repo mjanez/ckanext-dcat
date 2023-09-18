@@ -984,6 +984,104 @@ class RDFProfile(object):
         except ValueError:
             self.g.add((subject, predicate, _type(value)))
 
+    def _get_catalog_issued(self):
+        '''
+        Returns the date and time the catalog was issued
+
+        To be more precise, the most recent value for `issued` on a dataset.
+
+        Returns a dateTime string in ISO format, or None if it could not be
+        found.
+        '''
+        context = {
+            'ignore_auth': True
+        }
+        result = toolkit.get_action('package_search')(context, {
+            'sort': 'metadata_created desc',
+            'rows': 1,
+        })
+        if result and result.get('results'):
+            return result['results'][0]['metadata_created']
+        return None
+
+    def _get_catalog_dcat_themetaxonomy(self):
+        '''
+        Returns the value of the `theme_es` field from the most recently created dataset,
+        or the value of the `theme_eu` field if `theme_es` is not present.
+
+        Returns None if neither `theme_es` nor `theme_eu` are present in the dataset.
+
+        Returns:
+            A string with the value of the `theme_es` or `theme_eu` field, or None if not found.
+        '''
+        context = {
+            'ignore_auth': True
+        }
+        result = toolkit.get_action('package_search')(context, {
+            'sort': 'metadata_created desc',
+            'rows': 1,
+        })
+        if result and result.get('results'):
+            if 'theme_es' in result['results'][0]:
+                return result['results'][0]['theme_es'][0]
+            elif 'theme_eu' in result['results'][0]:
+                return result['results'][0]['theme_eu'][0]
+        return None
+
+    def _get_catalog_license(self):
+        '''
+        Returns the URL of the license for the most recently modified dataset.
+
+        Returns:
+            A string with the URL of the license, or None if it could not be found.
+        '''
+        context = {
+            'ignore_auth': True
+        }
+        result = toolkit.get_action('package_search')(context, {
+            'sort': 'metadata_modified desc',
+            'rows': 1,
+        })
+        if result and result.get('results'):
+            return result['results'][0]['license_url']
+        return None
+
+    def _get_catalog_access_rights(self):
+        '''
+        Returns the value of the `access_rights` field from the most recently modified dataset.
+
+        Returns:
+            A string with the value of the `access_rights` field, or None if it could not be found.
+        '''
+        context = {
+            'ignore_auth': True
+        }
+        result = toolkit.get_action('package_search')(context, {
+            'sort': 'metadata_modified desc',
+            'rows': 1,
+        })
+        if result and result.get('results'):
+            return result['results'][0]['access_rights']
+        return None
+
+    def _get_catalog_publisher_uri(self):
+        '''
+        Returns the value of the `publisher_uri` field from the most recently modified dataset.
+
+        Returns:
+            A string with the value of the `publisher_uri` field, or None if it could not be found.
+        '''
+        context = {
+            'ignore_auth': True
+        }
+        result = toolkit.get_action('package_search')(context, {
+            'sort': 'metadata_modified desc',
+            'rows': 1,
+        })
+        if result and result.get('results'):
+            return result['results'][0]['publisher_uri']
+        return None
+
     def _last_catalog_modification(self):
         '''
         Returns the date and time the catalog was last modified
@@ -1746,33 +1844,43 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         g.add((catalog_ref, RDF.type, DCAT.Catalog))
         
+        #FIXME: Unused. Mandatory ckan.locale_default: https://w3c.github.io/dxwg/dcat/#Property:resource_language
         catalog_language = self._search_value_codelist(MD_EU_LANGUAGES, config.get('ckan.locale_default'), "label","id") or "http://publications.europa.eu/resource/authority/language/ENG"
 
         # Basic fields
+        license, theme_taxonomy, publisher_uri, access_rights = [
+            self._get_catalog_license(),
+            self._get_catalog_dcat_themetaxonomy(),
+            self._get_catalog_publisher_uri(),
+            self._get_catalog_access_rights()]
+
         items = [
             ('title', DCT.title, config.get('ckan.site_title'), Literal),
             ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
-            ('language', DCT.language, catalog_language, URIRefOrLiteral),
+            ('language', DCT.language, config.get('ckan.locale_default'), URIRefOrLiteral),
             ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef),
-            ('publisher', DCT.publisher, config.get('ckan.site_url'), URIRef)
+            ('publisher', DCT.publisher, publisher_uri, URIRef),
+            ('theme_taxonomy', DCAT.themeTaxonomy, theme_taxonomy, URIRef),
+            ('license', DCT.license, license, URIRef),
+            ('access_rights', DCT.accessRights, access_rights, URIRefOrLiteral),
         ]
-
+         
         for item in items:
             key, predicate, fallback, _type = item
-            if catalog_dict:
-                value = catalog_dict.get(key, fallback)
-            else:
-                value = fallback
+            value = catalog_dict.get(key, fallback) if catalog_dict else fallback
             if value:
                 g.add((catalog_ref, predicate, _type(value)))
 
         # Dates
         modified = self._last_catalog_modification()
-        if modified:
-            self._add_date_triple(catalog_ref, DCT.modified, modified)
-
+        issued = self._get_catalog_issued()
+        if modified or issued or license:
+            if modified:
+                self._add_date_triple(catalog_ref, DCT.modified, modified)
+            if issued:
+                self._add_date_triple(catalog_ref, DCT.issued, issued)
 
 class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
     '''
