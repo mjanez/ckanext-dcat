@@ -26,6 +26,7 @@ import re
 import csv
 from pathlib import Path
 
+DC = Namespace("http://purl.org/dc/elements/1.1/")
 DCT = Namespace("http://purl.org/dc/terms/")
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
 DCATAP = Namespace("http://data.europa.eu/r5r/")
@@ -45,6 +46,7 @@ CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
 
 # CKAN field_name for national DCAT theme URIs.
 DCAT_THEME_NATIONAL = 'theme_es'
+DCAT_CATALOG_THEME_TAXONOMY = 'http://publications.europa.eu/resource/authority/data-theme'
 
 # DFs with MD INSPIRE Register codelists
 codelist_paths = [os.path.join(CODELISTS_DIR, f) for f in os.listdir(CODELISTS_DIR) if f.endswith(".csv")]
@@ -1004,7 +1006,7 @@ class RDFProfile(object):
             return result['results'][0]['metadata_created']
         return None
 
-    def _get_catalog_dcat_themetaxonomy(self):
+    def _get_catalog_dcat_theme(self):
         '''
         Returns the value of the `theme_es` field from the most recently created dataset,
         or the value of the `theme_eu` field if `theme_es` is not present.
@@ -1844,13 +1846,12 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         g.add((catalog_ref, RDF.type, DCAT.Catalog))
         
-        #FIXME: Unused. Mandatory ckan.locale_default: https://w3c.github.io/dxwg/dcat/#Property:resource_language
+        # Mandatory ckan.locale_default: https://w3c.github.io/dxwg/dcat/#Property:resource_language
         catalog_language = self._search_value_codelist(MD_EU_LANGUAGES, config.get('ckan.locale_default'), "label","id") or "http://publications.europa.eu/resource/authority/language/ENG"
 
         # Basic fields
-        license, theme_taxonomy, publisher_uri, access_rights = [
+        license, publisher_uri, access_rights = [
             self._get_catalog_license(),
-            self._get_catalog_dcat_themetaxonomy(),
             self._get_catalog_publisher_uri(),
             self._get_catalog_access_rights()]
 
@@ -1859,10 +1860,10 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
-            ('language', DCT.language, config.get('ckan.locale_default'), URIRefOrLiteral),
+            ('language', DCT.language, catalog_language, URIRefOrLiteral),
             ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef),
             ('publisher', DCT.publisher, publisher_uri, URIRef),
-            ('theme_taxonomy', DCAT.themeTaxonomy, theme_taxonomy, URIRef),
+            ('theme_taxonomy', DCAT.themeTaxonomy, DCAT_CATALOG_THEME_TAXONOMY, URIRef),
             ('license', DCT.license, license, URIRef),
             ('access_rights', DCT.accessRights, access_rights, URIRefOrLiteral),
         ]
