@@ -46,7 +46,9 @@ CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
 
 # CKAN field_name for national DCAT theme URIs.
 DCAT_THEME_NATIONAL = 'theme_es'
+# Mandatory catalog elements by NTI-RISP. Language at least 'es'
 DCAT_CATALOG_THEME_TAXONOMY = 'http://datos.gob.es/kos/sector-publico/sector/'
+DCAT_DEFAULT_LANMGUAGE = 'es'
 
 # DFs with MD INSPIRE Register codelists
 codelist_paths = [os.path.join(CODELISTS_DIR, f) for f in os.listdir(CODELISTS_DIR) if f.endswith(".csv")]
@@ -1860,7 +1862,11 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
             ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
-            ('language', DC.language, config.get('ckan.locale_default'), URIRefOrLiteral),
+            # Mandatory NTI-RISP at least 'es'
+            ('dc_language_code_es', DC.language, DCAT_DEFAULT_LANMGUAGE, URIRefOrLiteral),
+            ('dc_language_code', DC.language, config.get('ckan.locale_default'), URIRefOrLiteral),
+            ('dtc_language_es', DCT.language, 'http://publications.europa.eu/resource/authority/language/SPA', URIRefOrLiteral),
+            ('dtc_language', DCT.language, catalog_language, URIRefOrLiteral),
             ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef),
             ('publisher', DCT.publisher, publisher_uri, URIRef),
             ('theme_taxonomy', DCAT.themeTaxonomy, DCAT_CATALOG_THEME_TAXONOMY, URIRef),
