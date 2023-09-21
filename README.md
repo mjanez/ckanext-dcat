@@ -11,6 +11,10 @@ This extension provides plugins that allow CKAN to expose and consume metadata f
 
 It also offers other features related to Semantic Data like exposing the necessary markup to get your datasets indexed in [Google Dataset Search](https://toolbox.google.com/datasetsearch).
 
+>**Warning**
+> * Custom extension designed for use with: [`mjanez/ckanext-scheming_dcat`](https://github.com/mjanez/scheming_dcat)
+>*  Contains [custom profiles](#custom-profiles) as `euro_dcat_ap_2`, `spain_dcat` or `spain_dcat_ap` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-scheming_dcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-scheming_dcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-scheming_dcat#schemas))
+
 
 ## Contents
 
@@ -685,8 +689,12 @@ The default profile is mostly based in the
 
 Sites that want to support a particular version of the DCAT-AP can enable a specific profile using one of the methods below:
 
+
+### Custom profiles
 * DCAT-AP v2.1.0 (default): `euro_dcat_ap_2`
 * DCAT-AP v1.1.1: `euro_dcat_ap`
+* Spain NTI-RISP v1.0.0: `spain_dcat`
+* Spain DCAT-AP v.0.0.1: `spain_dcat_ap`
 
 This plugin also contains a profile to serialize a CKAN dataset to a [schema.org Dataset](http://schema.org/Dataset) called `schemaorg`. This is especially useful to provide [JSON-LD structured data](#structured-data).
 
@@ -774,6 +782,7 @@ Extensions define their available profiles using the `ckan.rdf.profiles` in the 
     [ckan.rdf.profiles]
     euro_dcat_ap=ckanext.dcat.profiles:EuropeanDCATAPProfile
     euro_dcat_ap_2=ckanext.dcat.profiles:EuropeanDCATAP2Profile
+    spain_dcat=ckanext.dcat.profiles:SpanishDCATAPProfile
     schemaorg=ckanext.dcat.profiles:SchemaOrgProfile
 
 ### Command line interface

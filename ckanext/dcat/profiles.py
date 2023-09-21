@@ -26,6 +26,10 @@ import re
 import csv
 from pathlib import Path
 
+# Default values
+from ckanext.dcat.profiles_default import metadata_field_names, spain_dcat_default_values, euro_dcat_ap_default_values
+from ckanext.dcat.codelists import load_codelists
+
 DC = Namespace("http://purl.org/dc/elements/1.1/")
 DCT = Namespace("http://purl.org/dc/terms/")
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
@@ -34,7 +38,7 @@ ADMS = Namespace("http://www.w3.org/ns/adms#")
 VCARD = Namespace("http://www.w3.org/2006/vcard/ns#")
 FOAF = Namespace("http://xmlns.com/foaf/0.1/")
 SCHEMA = Namespace('http://schema.org/')
-TIME = Namespace('http://www.w3.org/2006/time')
+TIME = Namespace('http://www.w3.org/2006/time#')
 LOCN = Namespace('http://www.w3.org/ns/locn#')
 GSP = Namespace('http://www.opengis.net/ont/geosparql#')
 OWL = Namespace('http://www.w3.org/2002/07/owl#')
@@ -42,38 +46,15 @@ SPDX = Namespace('http://spdx.org/rdf/terms#')
 CNT = Namespace('http://www.w3.org/2011/content#')
 
 GEOJSON_IMT = 'http://www.iana.org/assignments/media-types/application/vnd.geo+json'
-CODELISTS_DIR = Path(__file__).resolve().parent / "codelists"
-
-# CKAN field_name for national DCAT theme URIs.
-DCAT_THEME_NATIONAL = 'theme_es'
-# Mandatory catalog elements by NTI-RISP. Language at least 'es'
-DCAT_CATALOG_THEME_TAXONOMY = 'http://datos.gob.es/kos/sector-publico/sector/'
-DCAT_DEFAULT_LANMGUAGE = 'es'
-
-# DFs with MD INSPIRE Register codelists
-codelist_paths = [os.path.join(CODELISTS_DIR, f) for f in os.listdir(CODELISTS_DIR) if f.endswith(".csv")]
-codelists_dfs = {}
-
-# Iterate over file paths and read in data
-codelists_dfs = {}
-for file_path in codelist_paths:
-    with open(file_path, "r") as f:
-        reader = csv.reader(f, delimiter=",")
-        header = next(reader)
-        df = []
-        for row in reader:
-            df.append(dict(zip(header, row)))
-        file_name = os.path.splitext(os.path.basename(file_path))[0].lower()
-        codelists_dfs[file_name] = df
 
 # INSPIRE Codelists
-MD_INSPIRE_REGISTER = []
-for df in codelists_dfs.values():
-    MD_INSPIRE_REGISTER += df
-MD_FORMAT = codelists_dfs.get("file-type")
-MD_THEME_NATIONAL = codelists_dfs.get(DCAT_THEME_NATIONAL)
-MD_DCAT_AP_THEME = codelists_dfs.get("theme-dcat_ap")
-MD_EU_LANGUAGES = codelists_dfs.get("languages")
+codelists = load_codelists()
+MD_INSPIRE_REGISTER = codelists['MD_INSPIRE_REGISTER']
+MD_FORMAT = codelists['MD_FORMAT']
+MD_ES_THEMES = codelists['MD_ES_THEMES']
+MD_EU_THEMES = codelists['MD_EU_THEMES']
+MD_EU_LANGUAGES = codelists['MD_EU_LANGUAGES']
+MD_ES_FORMATS = codelists['MD_ES_FORMATS']
 
 namespaces = {
     'dct': DCT,
@@ -220,13 +201,13 @@ class RDFProfile(object):
             if data_es_pattern.match(theme):
                 themes.add(theme)
                 if theme:
-                    theme_es_dcat_ap = self._search_value_codelist(MD_THEME_NATIONAL, theme, "id","dcat_ap") or None
+                    theme_es_dcat_ap = self._search_value_codelist(MD_ES_THEMES, theme, "id","dcat_ap") or None
                     themes.add(theme_es_dcat_ap)
                 
             elif inspire_eu_pattern.match(theme):
                 themes.add(theme)
                 if theme:
-                    theme_eu_dcat_ap = self._search_value_codelist(MD_DCAT_AP_THEME, theme, "id","dcat_ap") or None
+                    theme_eu_dcat_ap = self._search_value_codelist(MD_EU_THEMES, theme, "id","dcat_ap") or None
                     themes.add(theme_eu_dcat_ap)
                     
 
@@ -563,7 +544,7 @@ class RDFProfile(object):
 
     def _search_values_codelist_add_to_graph(self, metadata_codelist, labels, dataset_dict, dataset_ref, dataset_tag_base, g, dcat_property):
         # Create a dictionary with label as key and id as value for each element in metadata_codelist
-        inspire_dict = {row['label'].lower(): row['id'] for row in metadata_codelist}
+        inspire_dict = {row['label'].lower(): row.get('id', row.get('value')) for row in metadata_codelist}
         
         # Check if labels is a list, if not, convert it to a list
         if not isinstance(labels, list):
@@ -578,19 +559,29 @@ class RDFProfile(object):
                     tag_val = f'{dataset_tag_base}/dataset/?tags={label}'
                 g.add((dataset_ref, dcat_property, URIRefOrLiteral(tag_val)))
 
-    def _search_value_codelist(self, metadata_codelist, label, input_field_name, output_field_name):
-        # Create a dictionary with label as key and id as value for each element in metadata_codelist
-        tag_val = label
+    def _search_value_codelist(self, metadata_codelist, label, input_field_name, output_field_name, return_value=True):
+        """Searches for a value in a metadata codelist.
+
+        Args:
+            metadata_codelist (list): A list of dictionaries containing the metadata codelist.
+            label (str): The label to search for in the codelist.
+            input_field_name (str): The name of the input field in the codelist.
+            output_field_name (str): The name of the output field in the codelist.
+            return_value (bool): Whether to return the label value if not found (True) or None if not found (False). Default is True.
+
+        Returns:
+            str or None: The value found in the codelist, or None if not found and return_value is False.
+        """
         inspire_dict = {row[input_field_name].lower(): row[output_field_name] for row in metadata_codelist}
-                
-        # Check if tag_name is in inspire_dict
-        try:
-            if label.lower() in inspire_dict:
-                tag_val = inspire_dict[label.lower()]
-        except:
-            pass
-            
-        return tag_val
+        tag_val = inspire_dict.get(label.lower(), None)
+        if not return_value and tag_val is None:
+            return None
+        elif not return_value and tag_val:
+            return tag_val        
+        elif return_value == True and tag_val is None:
+            return label
+        else:
+            return tag_val
 
     def _spatial(self, subject, predicate):
         '''
@@ -988,25 +979,45 @@ class RDFProfile(object):
         except ValueError:
             self.g.add((subject, predicate, _type(value)))
 
-    def _get_catalog_issued(self):
+    def _get_catalog_field(self, field_name, default_values_dict=euro_dcat_ap_default_values, fallback=None, return_none=False, order='desc'):
         '''
-        Returns the date and time the catalog was issued
+        Returns the value of a field from the most recently modified dataset.
 
-        To be more precise, the most recent value for `issued` on a dataset.
+        Args:
+            field_name (str): The name of the field to retrieve from datasets list
+            default_values_dict (dict): A dictionary of default values to use if the field is not found. Defaults to euro_dcat_ap_default_values.
+            fallback (str): The name of the fallback field to retrieve if `field_name` is not found. Defaults to None.
+            return_none (bool): Whether to return None if the field is not found. Defaults to False.
+            order (str): The order in which to sort the results. Defaults to 'desc'.
 
-        Returns a dateTime string in ISO format, or None if it could not be
-        found.
+        Returns:
+            The value of the field, or the default value if it could not be found and `return_none` is False.
+
+        Notes:
+            This function caches the result of the CKAN API call to improve performance. The cache is stored in the `_catalog_search_result` attribute of the object. If the attribute exists, the function will return the value of the requested field from the cached result instead of making a new API call. If the attribute does not exist, the function will make a new API call and store the result in the attribute for future use.
         '''
-        context = {
-            'ignore_auth': True
-        }
-        result = toolkit.get_action('package_search')(context, {
-            'sort': 'metadata_created desc',
-            'rows': 1,
-        })
-        if result and result.get('results'):
-            return result['results'][0]['metadata_created']
-        return None
+        if not hasattr(self, '_catalog_search_result'):
+            context = {
+                'ignore_auth': True
+            }
+            self._catalog_search_result = toolkit.get_action('package_search')(context, {
+                'sort': f'metadata_modified {order}',
+                'rows': 1,
+            })
+        try:
+            if self._catalog_search_result and self._catalog_search_result.get('results'):
+                return self._catalog_search_result['results'][0][field_name]
+        except KeyError:
+            pass
+        if fallback:
+            try:
+                if self._catalog_search_result and self._catalog_search_result.get('results'):
+                    return self._catalog_search_result['results'][0][fallback]
+            except KeyError:
+                pass
+        if return_none:
+            return None
+        return default_values_dict[field_name]
 
     def _get_catalog_dcat_theme(self):
         '''
@@ -1032,12 +1043,15 @@ class RDFProfile(object):
                 return result['results'][0]['theme_eu'][0]
         return None
 
-    def _get_catalog_license(self):
+    def _get_catalog_language(self, default_values=euro_dcat_ap_default_values):
         '''
-        Returns the URL of the license for the most recently modified dataset.
+        Returns the value of the `language` field from the most recently modified dataset.
+
+        Args:
+            default_values (dict): A dictionary of default values to use if the `publisher_uri` field cannot be found.
 
         Returns:
-            A string with the URL of the license, or None if it could not be found.
+            A string with the value of the `language` field, or None if it could not be found.
         '''
         context = {
             'ignore_auth': True
@@ -1046,45 +1060,12 @@ class RDFProfile(object):
             'sort': 'metadata_modified desc',
             'rows': 1,
         })
-        if result and result.get('results'):
-            return result['results'][0]['license_url']
-        return None
-
-    def _get_catalog_access_rights(self):
-        '''
-        Returns the value of the `access_rights` field from the most recently modified dataset.
-
-        Returns:
-            A string with the value of the `access_rights` field, or None if it could not be found.
-        '''
-        context = {
-            'ignore_auth': True
-        }
-        result = toolkit.get_action('package_search')(context, {
-            'sort': 'metadata_modified desc',
-            'rows': 1,
-        })
-        if result and result.get('results'):
-            return result['results'][0]['access_rights']
-        return None
-
-    def _get_catalog_publisher_uri(self):
-        '''
-        Returns the value of the `publisher_uri` field from the most recently modified dataset.
-
-        Returns:
-            A string with the value of the `publisher_uri` field, or None if it could not be found.
-        '''
-        context = {
-            'ignore_auth': True
-        }
-        result = toolkit.get_action('package_search')(context, {
-            'sort': 'metadata_modified desc',
-            'rows': 1,
-        })
-        if result and result.get('results'):
-            return result['results'][0]['publisher_uri']
-        return None
+        try:
+            if result and result.get('results'):
+                return result['results'][0]['language']
+            
+        except KeyError:
+            return default_values['language']
 
     def _last_catalog_modification(self):
         '''
@@ -1239,6 +1220,10 @@ class EuropeanDCATAPProfile(RDFProfile):
     '''
     An RDF profile based on the DCAT-AP for data portals in Europe
 
+    Default values for some fields:
+    
+    ckanext-dcat/ckanext/dcat/profiles_default.py
+
     More information and specification:
 
     https://joinup.ec.europa.eu/asset/dcat_application_profile
@@ -1295,7 +1280,7 @@ class EuropeanDCATAPProfile(RDFProfile):
         for key, predicate, in (
                 ('language', DCT.language),
                 ('theme', DCAT.theme),
-                (DCAT_THEME_NATIONAL, DCAT.theme),
+                (metadata_field_names['spain_dcat']['theme'], DCAT.theme),
                 ('alternate_identifer', ADMS.identifier),
                 ('inspire_id', ADMS.identifier),
                 ('conforms_to', DCT.conformsTo),
@@ -1488,10 +1473,10 @@ class EuropeanDCATAPProfile(RDFProfile):
         # Access Rights
         # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
         if self._get_dataset_value(dataset_dict, 'access_rights'):
-            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/PUBLIC")))
+                g.add((dataset_ref, DCT.accessRights, URIRef(self._get_dataset_value(dataset_dict, 'access_rights'))))
         else:
-            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/NON_PUBLIC")))
-           
+            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/PUBLIC")))
+            
         # Tags
         # Pre-process keywords inside INSPIRE MD Codelists and update dataset_dict
         dataset_tag_base = f"{dataset_ref.split('/dataset/')[0]}"
@@ -1513,7 +1498,7 @@ class EuropeanDCATAPProfile(RDFProfile):
         items = [
             ('language', DCT.language, None, URIRefOrLiteral),
             ('theme', DCAT.theme, None, URIRef),
-            (DCAT_THEME_NATIONAL, DCAT.theme, None, URIRef),
+            (metadata_field_names['spain_dcat']['theme'], DCAT.theme, None, URIRef),
             ('conforms_to', DCT.conformsTo, None, URIRef),
             ('metadata_profile', DCT.conformsTo, None, URIRef),
             ('alternate_identifier', ADMS.identifier, None, URIRefOrLiteral),
@@ -1522,7 +1507,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('related_resource', DCT.relation, None, URIRefOrLiteral),
             ('has_version', DCT.hasVersion, None, URIRefOrLiteral),
             ('is_version_of', DCT.isVersionOf, None, URIRefOrLiteral),
-            ('lineage_source', DCT.source, None, URIRefOrLiteral),
+            ('lineage_source', DCT.source, None, Literal),
             ('source', DCT.source, None, URIRefOrLiteral),
             ('sample', ADMS.sample, None, URIRefOrLiteral),
         ]
@@ -1848,29 +1833,28 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         g.add((catalog_ref, RDF.type, DCAT.Catalog))
         
-        #FIXME: Unused. Mandatory ckan.locale_default: https://w3c.github.io/dxwg/dcat/#Property:resource_language
-        catalog_language = self._search_value_codelist(MD_EU_LANGUAGES, config.get('ckan.locale_default'), "label","id") or "http://publications.europa.eu/resource/authority/language/ENG"
-
         # Basic fields
-        license, publisher_uri, access_rights = [
-            self._get_catalog_license(),
-            self._get_catalog_publisher_uri(),
-            self._get_catalog_access_rights()]
+        license, publisher_identifier, access_rights, spatial_uri, language = [
+            self._get_catalog_field(field_name='license_url'),
+            self._get_catalog_field(field_name='publisher_identifier', fallback='publisher_uri'),
+            self._get_catalog_field(field_name='access_rights'),
+            self._get_catalog_field(field_name='spatial_uri'),
+            self._search_value_codelist(MD_EU_LANGUAGES, config.get('ckan.locale_default'), "label","id") or euro_dcat_ap_default_values['language'],
+            ]
 
+        # Mandatory elements by NTI-RISP (datos.gob.es)
         items = [
+            ('identifier', DCT.identifier, f'{config.get("ckan_url")}/catalog.rdf', Literal),
             ('title', DCT.title, config.get('ckan.site_title'), Literal),
             ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
             ('description', DCT.description, config.get('ckan.site_description'), Literal),
-            ('homepage', FOAF.homepage, config.get('ckan.site_url'), URIRef),
-            # Mandatory NTI-RISP at least 'es'
-            ('dc_language_code_es', DC.language, DCAT_DEFAULT_LANMGUAGE, URIRefOrLiteral),
-            ('dc_language_code', DC.language, config.get('ckan.locale_default'), URIRefOrLiteral),
-            ('dtc_language_es', DCT.language, 'http://publications.europa.eu/resource/authority/language/SPA', URIRefOrLiteral),
-            ('dtc_language', DCT.language, catalog_language, URIRefOrLiteral),
-            ('conforms_to', DCT.conformsTo, 'http://data.europa.eu/930/', URIRef),
-            ('publisher', DCT.publisher, publisher_uri, URIRef),
-            ('theme_taxonomy', DCAT.themeTaxonomy, DCAT_CATALOG_THEME_TAXONOMY, URIRef),
+            ('publisher_identifier', DCT.publisher, publisher_identifier, URIRef),
+            ('language', DCT.language, language, URIRefOrLiteral),
+            ('spatial_uri', DCT.spatial, spatial_uri, URIRefOrLiteral),
+            ('theme_taxonomy', DCAT.themeTaxonomy, euro_dcat_ap_default_values['theme_taxonomy'], URIRef),
+            ('homepage', FOAF.homepage, config.get('ckan_url'), URIRef),
             ('license', DCT.license, license, URIRef),
+            ('conforms_to', DCT.conformsTo, euro_dcat_ap_default_values['conformance'], URIRef),
             ('access_rights', DCT.accessRights, access_rights, URIRefOrLiteral),
         ]
          
@@ -1881,8 +1865,8 @@ class EuropeanDCATAPProfile(RDFProfile):
                 g.add((catalog_ref, predicate, _type(value)))
 
         # Dates
-        modified = self._last_catalog_modification()
-        issued = self._get_catalog_issued()
+        modified = self._get_catalog_field(field_name='metadata_modified')
+        issued = self._get_catalog_field(field_name='metadata_created', order='asc')
         if modified or issued or license:
             if modified:
                 self._add_date_triple(catalog_ref, DCT.modified, modified)
@@ -2108,6 +2092,456 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
         # call super method
         super(EuropeanDCATAP2Profile, self).graph_from_catalog(catalog_dict, catalog_ref)
 
+class SpanishDCATProfile(EuropeanDCATAPProfile):
+    '''
+    An RDF profile based on the DCAT NTI-RISP profile for data portals in Spain
+
+    Default values for some fields:
+    
+    ckanext-dcat/ckanext/dcat/profiles_default.py
+
+    More information and specification:
+
+    https://datos.gob.es/es/documentacion/guia-de-aplicacion-de-la-norma-tecnica-de-interoperabilidad-de-reutilizacion-de
+
+    '''
+    def parse_dataset(self, dataset_dict, dataset_ref):
+        """
+        Parses a CKAN dataset dictionary and generates an RDF graph.
+
+        Args:
+            dataset_dict (dict): The dictionary containing the dataset metadata.
+            dataset_ref (URIRef): The URI of the dataset in the RDF graph.
+
+        Returns:
+            dict: The updated dataset dictionary with the RDF metadata.
+        """
+        # call super method
+        super(SpanishDCATProfile, self).parse_dataset(dataset_dict, dataset_ref)
+
+        # Lists
+        for key, predicate in (
+            ('theme_es', DCAT.theme),
+            ('temporal_resolution', DCAT.temporalResolution),
+            ('is_referenced_by', DCT.isReferencedBy),
+        ):
+            values = self._object_value_list(dataset_ref, predicate)
+            if values:
+                dataset_dict['extras'].append({'key': key,
+                                               'value': json.dumps(values)})
+        # Temporal
+        start, end = self._time_interval(dataset_ref, DCT.temporal, dcat_ap_version=2)
+        if start:
+            self._insert_or_update_temporal(dataset_dict, 'temporal_start', start)
+        if end:
+            self._insert_or_update_temporal(dataset_dict, 'temporal_end', end)
+
+        # Spatial
+        spatial = self._spatial(dataset_ref, DCT.spatial)
+        for key in ('bbox', 'centroid'):
+            self._add_spatial_to_dict(dataset_dict, key, spatial)
+
+        # Spatial resolution in meters
+        spatial_resolution_in_meters = self._object_value_int_list(
+            dataset_ref, DCAT.spatialResolutionInMeters)
+        if spatial_resolution_in_meters:
+            dataset_dict['extras'].append({'key': 'spatial_resolution_in_meters',
+                                           'value': json.dumps(spatial_resolution_in_meters)})
+
+        # Resources
+        for distribution in self._distributions(dataset_ref):
+            distribution_ref = str(distribution)
+            for resource_dict in dataset_dict.get('resources', []):
+                # Match distribution in graph and distribution in resource dict
+                if resource_dict and distribution_ref == resource_dict.get('distribution_ref'):
+                    #  Simple values
+                    for key, predicate in (
+                            ('availability', DCATAP.availability),
+                            ('compress_format', DCAT.compressFormat),
+                            ('package_format', DCAT.packageFormat),
+                            ):
+                        value = self._object_value(distribution, predicate)
+                        if value:
+                            resource_dict[key] = value
+
+                    # Access services
+                        access_service_list = []
+
+                        for access_service in self.g.objects(distribution, DCAT.accessService):
+                            access_service_dict = {}
+
+                            #  Simple values
+                            for key, predicate in (
+                                    ('availability', DCATAP.availability),
+                                    ('title', DCT.title),
+                                    ('endpoint_description', DCAT.endpointDescription),
+                                    ('license', DCT.license),
+                                    ('access_rights', DCT.accessRights),
+                                    ('description', DCT.description),
+                                    ):
+                                value = self._object_value(access_service, predicate)
+                                if value:
+                                    access_service_dict[key] = value
+                            #  List
+                            for key, predicate in (
+                                    ('endpoint_url', DCAT.endpointURL),
+                                    ('serves_dataset', DCAT.servesDataset),
+                                    ('resource_relation', DCT.relation),
+                                    ):
+                                values = self._object_value_list(access_service, predicate)
+                                if values:
+                                    access_service_dict[key] = values
+
+                            # Access service URI (explicitly show the missing ones)
+                            access_service_dict['uri'] = (str(access_service)
+                                    if isinstance(access_service, URIRef)
+                                    else '')
+
+                            # Remember the (internal) access service reference for referencing in
+                            # further profiles, e.g. for adding more properties
+                            access_service_dict['access_service_ref'] = str(access_service)
+
+                            access_service_list.append(access_service_dict)
+
+                        if access_service_list:
+                            resource_dict['access_services'] = json.dumps(access_service_list)
+
+        return dataset_dict
+
+    def graph_from_dataset(self, dataset_dict, dataset_ref):
+        """
+        Generates an RDF graph from a dataset dictionary.
+
+        Args:
+            dataset_dict (dict): The dictionary containing the dataset metadata.
+            dataset_ref (URIRef): The URI of the dataset in the RDF graph.
+
+        Returns:
+            None
+        """
+        
+        # Namespaces
+        self._bind_namespaces()
+        
+        g = self.g
+
+        for prefix, namespace in namespaces.items():
+            g.bind(prefix, namespace)
+
+        g.add((dataset_ref, RDF.type, DCAT.Dataset))
+
+        # Basic elements (Title, description, Dates)
+        basic_elements = [
+            ('title', DCT.title, None, Literal),
+            ('url', DCAT.landingPage, None, URIRef),
+        ]
+        
+        dates = [
+            ('created', DCT.created, ['metadata_created'], Literal),
+            ('issued', DCT.issued, ['metadata_created'], Literal),
+            ('modified', DCT.modified, ['metadata_modified'], Literal),
+            ('valid', DCT.valid, None, Literal),
+        ]
+        
+        self._add_date_triples_from_dict(dataset_dict, dataset_ref, dates)
+        self._add_list_triples_from_dict(dataset_dict, dataset_ref, basic_elements)
+        
+        # NTI-RISP Core elements
+        items = {
+            'notes': (DCT.description, spain_dcat_default_values['notes']),
+            'conforms_to_es': (DCT.conformsTo, spain_dcat_default_values['conformance_es']),
+            'identifier_uri': (DCT.identifier, dataset_ref),
+            'license_url': (DCT.license, spain_dcat_default_values['license_url']),
+            'language_code': (DC.language, spain_dcat_default_values['language_code'] or config.get('ckan.locale_default')),
+            'spatial_uri': (DCT.spatial, spain_dcat_default_values['spatial_uri']),
+            'publisher_identifier_es': (DCT.publisher,  spain_dcat_default_values['publisher_identifier'] or dataset_dict['publisher_identifier']),
+        }
+
+        self._add_dataset_triples_from_dict(dataset_dict, dataset_ref, items)      
+
+        # Lists
+        dataset_dict['tags'] = [tag['name'].replace(" ", "").lower() for tag in dataset_dict.get('tags', [])]
+
+        # Lists NTI-RISP Core
+        items_list = [
+            ('reference', DCT.references, None, URIRefOrLiteral),
+            ('tags', DCAT.keyword, None, Literal),
+            ('theme_es', DCAT.theme, spain_dcat_default_values['theme_es'], URIRefOrLiteral),
+        ]
+
+        #Lists DCAT-AP Extension
+        items_dcatap_list = [
+            ('conforms_to', DCT.conformsTo, None, URIRef),
+            ('metadata_profile', DCT.conformsTo, None, URIRef),
+        ]
+
+        items_list.extend(items_dcatap_list)
+        self._add_list_triples_from_dict(dataset_dict, dataset_ref, items_list)
+         
+        #FIXME Frequency - Frecuencia ('frequency', DCT.accrualPeriodicity, None, URIRefOrLiteral): https://github.com/ctt-gob-es/datos.gob.es/blob/30c4a0d97356e0caf948aff2bb74790f4885c67f/ckan/ckanext-dge-harvest/ckanext/dge_harvest/profiles.py#L2508
+
+        # Temporal - Cobertura temporal
+        self._temporal_graph(dataset_dict, dataset_ref)
+
+        # DCAT-AP Extension
+        geodcatap_items = {
+            'access_rights': (DCT.accessRights, spain_dcat_default_values['access_rights']),
+        }
+
+        self._add_dataset_triples_from_dict(dataset_dict, dataset_ref, geodcatap_items)    
+    
+        # Use fallback license if set in config
+        resource_license_fallback = None
+        if toolkit.asbool(config.get(DISTRIBUTION_LICENSE_FALLBACK_CONFIG, False)):
+            if 'license_id' in dataset_dict and isinstance(URIRefOrLiteral(dataset_dict['license_id']), URIRef):
+                resource_license_fallback = dataset_dict['license_id']
+            elif 'license_url' in dataset_dict and isinstance(URIRefOrLiteral(dataset_dict['license_url']), URIRef):
+                resource_license_fallback = dataset_dict['license_url']
+    
+        # Resources
+        for resource_dict in dataset_dict.get('resources', []):
+
+            distribution = CleanedURIRef(resource_uri(resource_dict))
+
+            g.add((dataset_ref, DCAT.distribution, distribution))
+
+            g.add((distribution, RDF.type, DCAT.Distribution))
+            
+            # NTI-RISP Core elements
+            items = {
+                'url': (DCAT.accessURL, None),
+                'name': (DCT.title, None),
+                'description': (DCT.description, spain_dcat_default_values['description']),
+                'language_code': (DC.language, spain_dcat_default_values['language_code'] or config.get('ckan.locale_default')),
+                'license': (DCT.license, spain_dcat_default_values['license']),
+                'identifier_uri': (DCT.identifier, distribution),
+                'size': (DCT.byteSize, None),
+            }
+
+            self._add_dataset_triples_from_dict(resource_dict, distribution, items)   
+
+            # Lists
+            items_lists = [
+                ('resource_relation', DCT.relation, None, URIRef),
+            ]
+
+            self._add_list_triples_from_dict(resource_dict, distribution, items_lists)
+
+            # Format/Mimetype - Formato de la distribución
+            self._distribution_format(resource_dict, distribution)
+    
+    def graph_from_catalog(self, catalog_dict, catalog_ref):
+        """
+        Adds the metadata of a CKAN catalog to the RDF graph.
+
+        Args:
+            catalog_dict (dict): A dictionary containing the metadata of the catalog.
+            catalog_ref (URIRef): The URI of the catalog in the RDF graph.
+
+        Returns:
+            None
+        """
+        g = self.g
+
+        for prefix, namespace in namespaces.items():
+            g.bind(prefix, namespace)
+
+        g.add((catalog_ref, RDF.type, DCAT.Catalog))
+        
+        # Basic fields
+        license, publisher_identifier, access_rights, spatial_uri, language_code = [
+            self._get_catalog_field(field_name='license_url', fallback='license_id', default_values_dict=spain_dcat_default_values),
+            spain_dcat_default_values['publisher_identifier'] or self._get_catalog_field(field_name='publisher_identifier', default_values_dict=spain_dcat_default_values),
+            self._get_catalog_field(field_name='access_rights', default_values_dict=spain_dcat_default_values),
+            self._get_catalog_field(field_name='spatial_uri', default_values_dict=spain_dcat_default_values),
+            spain_dcat_default_values['language_code'] or config.get('ckan.locale_default')
+            ]
+
+        # Mandatory elements by NTI-RISP (datos.gob.es)
+        items_core = [
+            ('title', DCT.title, config.get('ckan.site_title'), Literal),
+            ('description', DCT.description, config.get('ckan.site_description'), Literal),
+            ('publisher_identifier', DCT.publisher, publisher_identifier, URIRef),
+            ('identifier', DCT.identifier, f'{config.get("ckan_url")}/catalog.rdf', Literal),
+            ('encoding', CNT.characterEncoding, 'UTF-8', Literal),
+            ('language_code', DC.language, language_code, URIRefOrLiteral),
+            ('spatial_uri', DCT.spatial, spatial_uri, URIRefOrLiteral),
+            ('theme_taxonomy', DCAT.themeTaxonomy, spain_dcat_default_values['theme_taxonomy'], URIRef),
+            ('homepage', FOAF.homepage, config.get('ckan_url'), URIRef),
+        ]
+        
+        # DCAT-AP extension
+        items_dcatap = [
+            ('license', DCT.license, license, URIRef),
+            ('conforms_to', DCT.conformsTo, spain_dcat_default_values['conformance_es'], URIRef),
+            ('access_rights', DCT.accessRights, access_rights, URIRefOrLiteral),
+        ]
+         
+        items_core.extend(items_dcatap)
+         
+        for item in items_core:
+            key, predicate, fallback, _type = item
+            value = catalog_dict.get(key, fallback) if catalog_dict else fallback
+            if value:
+                g.add((catalog_ref, predicate, _type(value)))
+
+        #TODO: Tamaño del catálogo - dct:extent
+
+        # Dates
+        modified = self._get_catalog_field(field_name='metadata_modified', default_values_dict=spain_dcat_default_values)
+        issued = self._get_catalog_field(field_name='metadata_created', default_values_dict=spain_dcat_default_values, order='asc')
+        if modified or issued or license:
+            if modified:
+                self._add_date_triple(catalog_ref, DCT.modified, modified)
+            if issued:
+                self._add_date_triple(catalog_ref, DCT.issued, issued)
+
+    def _add_dataset_triples_from_dict(self, dataset_dict, dataset_ref, items):
+        """Adds triples to the RDF graph for the given dataset.
+
+        Args:
+            dataset_dict (dict): A dictionary containing the dataset metadata.
+            dataset_ref (rdflib.URIRef): The URI reference for the dataset.
+            items (dict): A dictionary containing the keys and values for the metadata items.
+
+        Returns:
+            None
+
+        """
+        
+        for key, (predicate, default_value) in items.items():
+            value = dataset_dict.get(key, default_value)
+            if value is not None:
+                self.g.add((dataset_ref, predicate, URIRefOrLiteral(value)))
+
+    def _bind_namespaces(self):
+        self.g.namespace_manager.bind('schema', namespaces['schema'], replace=True)
+
+    def _temporal_graph(self, dataset_dict, dataset_ref):
+        """Adds the dct:temporal triple to the RDF graph for the given dataset.
+
+        Args:
+            dataset_dict (dict): A dictionary containing the dataset metadata.
+            dataset_ref (rdflib.URIRef): The URI reference for the dataset.
+
+        Returns:
+            None
+
+        """
+        # Temporal
+        start = self._get_dataset_value(dataset_dict, 'temporal_start')
+        end = self._get_dataset_value(dataset_dict, 'temporal_end')
+
+        uid = 1
+
+        temporal_extent = URIRef(
+            "%s/%s-%s" % (dataset_ref, 'PeriodOfTime', uid))
+        self.g.add((temporal_extent, RDF.type, DCT.PeriodOfTime))
+        if start:
+            self._add_date_triple(
+                temporal_extent, SCHEMA.startDate, start)
+        if end:
+            self._add_date_triple(
+                temporal_extent, SCHEMA.endDate, end)
+        self.g.add((dataset_ref, DCT.temporal, temporal_extent))
+
+    def _distribution_format(self, resource_dict, distribution):
+        """
+        Generates an RDF triple for the format of a resource.
+
+        Args:
+            mime_type (str): The MIME type of the format.
+            label (str): The label of the format.
+
+        Returns:
+            str: The RDF triple for the format.
+        """
+        resource_format = resource_dict.get('format', spain_dcat_default_values['format_es'])
+
+        format_es = self._search_value_codelist(MD_ES_FORMATS, resource_format, 'label','label', False) or spain_dcat_default_values['format_es']
+        mime_type = self._search_value_codelist(MD_ES_FORMATS, format_es, 'label','id') or self.spain_dcat_default_values['mimetype_es']
+
+        if format_es:
+            imt = URIRef("%s/format" % distribution)
+            self.g.add((imt, RDF.type, DCT.IMT))
+            self.g.add((distribution, DCT['format'], imt))
+            self.g.add((imt, RDFS.label, Literal(format_es)))
+
+        if mime_type:
+            self.g.add((imt, RDF.value, Literal(mime_type)))
+
+    def _check_resource_url(self, resource_url, distribution):
+        """
+        Verifies if the URL of a resource is a download URL and adds the corresponding triple to the RDF graph.
+
+        Args:
+            resource_url (str): The URL of the resource.
+            distribution (URIRef): The URI of the distribution in the RDF graph.
+
+        Returns:
+            None
+        """
+        
+        download_keywords = ['descarga', 'download', 'get', 'file', 'data', 'archive', 'zip', 'rar', 'tar', 'gz', 'tgz', '7z', 'exe', 'msi', 'dmg', 'pkg', 'deb', 'rpm', 'iso', 'img', 'bin', 'cue', 'torrent', 'magnet', 'shp', 'gpkg', 'tiff']
+
+        if any(keyword in resource_url.lower() for keyword in download_keywords):
+            self.g.add((distribution, DCAT.downloadURL, URIRef(resource_url)))
+        else:
+            self.g.add((distribution, DCAT.accessURL, URIRef(resource_url)))
+
+#TODO: Spanish profile GeoDCAT-AP extension
+class SpanishDCATAPProfile(SpanishDCATProfile):
+    '''
+    An RDF profile based on the DCAT-AP to improve NTI-RISP profile for data portals in Spain
+
+    More information and specification:
+
+    https://semiceu.github.io/DCAT-AP/releases/3.0.0/
+
+    '''
+    def parse_dataset(self, dataset_dict, dataset_ref):
+        """
+        Parses a CKAN dataset dictionary and generates an RDF graph.
+
+        Args:
+            dataset_dict (dict): The dictionary containing the dataset metadata.
+            dataset_ref (URIRef): The URI of the dataset in the RDF graph.
+
+        Returns:
+            dict: The updated dataset dictionary with the RDF metadata.
+        """
+        # call super method
+        super(SpanishDCATAPProfile, self).parse_dataset(dataset_dict, dataset_ref)
+
+    def graph_from_dataset(self, dataset_dict, dataset_ref):
+        """
+        Generates an RDF graph from a dataset dictionary.
+
+        Args:
+            dataset_dict (dict): The dictionary containing the dataset metadata.
+            dataset_ref (URIRef): The URI of the dataset in the RDF graph.
+
+        Returns:
+            None
+        """
+        
+        # call super method
+        super(SpanishDCATAPProfile, self).graph_from_dataset(dataset_dict, dataset_ref)
+
+    def graph_from_catalog(self, catalog_dict, catalog_ref):
+        """
+        Adds the metadata of a CKAN catalog to the RDF graph.
+
+        Args:
+            catalog_dict (dict): A dictionary containing the metadata of the catalog.
+            catalog_ref (URIRef): The URI of the catalog in the RDF graph.
+
+        Returns:
+            None
+        """
+
+        # call super method
+        super(SpanishDCATAPProfile, self).graph_from_catalog(catalog_dict, catalog_ref)
 
 class SchemaOrgProfile(RDFProfile):
     '''
