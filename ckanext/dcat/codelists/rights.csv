@@ -1,0 +1,7 @@
+label,id
+Confidential,http://publications.europa.eu/resource/authority/access-right/CONFIDENTIAL,
+Non-public,http://publications.europa.eu/resource/authority/access-right/NON_PUBLIC,
+Normal,http://publications.europa.eu/resource/authority/access-right/NORMAL,
+Public,http://publications.europa.eu/resource/authority/access-right/PUBLIC
+Restricted,http://publications.europa.eu/resource/authority/access-right/RESTRICTED,
+Sensitive,http://publications.europa.eu/resource/authority/access-right/SENSITIVE,

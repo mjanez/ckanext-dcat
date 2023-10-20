@@ -20,14 +20,13 @@ from geomet import wkt, InvalidGeoJSONException
 from ckan.model.license import LicenseRegister
 from ckan.plugins import toolkit
 from ckan.lib.munge import munge_tag
-from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS
-import os
+from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS, get_langs
 import re
-import csv
-from pathlib import Path
+import logging
+from ckanext.scheming_dcat.helpers import schemingdct_get_default_lang
 
 # Default values
-from ckanext.dcat.profiles_default import metadata_field_names, spain_dcat_default_values, euro_dcat_ap_default_values
+from ckanext.dcat.profiles_default import metadata_field_names, spain_dcat_default_values, euro_dcat_ap_default_values, default_translated_fields, default_translated_fields_spain_dcat
 from ckanext.dcat.codelists import load_codelists
 
 DC = Namespace("http://purl.org/dc/elements/1.1/")
@@ -57,6 +56,7 @@ MD_EU_LANGUAGES = codelists['MD_EU_LANGUAGES']
 MD_ES_FORMATS = codelists['MD_ES_FORMATS']
 
 namespaces = {
+    'dc': DC,
     'dct': DCT,
     'dcat': DCAT,
     'dcatap': DCATAP,
@@ -77,6 +77,9 @@ PREFIX_MAILTO = u'mailto:'
 
 DISTRIBUTION_LICENSE_FALLBACK_CONFIG = 'ckanext.dcat.resource.inherit.license'
 
+DEFAULT_LANG = schemingdct_get_default_lang()
+
+log = logging.getLogger(__name__)
 
 class URIRefOrLiteral(object):
     '''Helper which creates an URIRef if the value appears to be an http URL,
@@ -225,7 +228,7 @@ class RDFProfile(object):
             return _object
         return None
 
-    def _object_value(self, subject, predicate):
+    def _object_value(self, subject, predicate, multilang=False):
         '''
         Given a subject and a predicate, returns the value of the object
 
@@ -233,12 +236,24 @@ class RDFProfile(object):
 
         If found, the string representation is returned, else an empty string
         '''
-        default_lang = config.get('ckan.locale_default', 'en')
+        lang_dict = {}
         fallback = ''
         for o in self.g.objects(subject, predicate):
             if isinstance(o, Literal):
-                if o.language and o.language == default_lang:
+                if o.language and o.language == DEFAULT_LANG:
                     return str(o)
+                if multilang and o.language:
+                    lang_dict[o.language] = str(o)
+                elif multilang:
+                    lang_dict[DEFAULT_LANG] = str(o)
+                else:
+                    return str(o)
+                if multilang:
+                    # when translation does not exist, create an empty one
+                    for lang in get_langs():
+                        if lang not in lang_dict:
+                            lang_dict[lang] = ''
+                    return lang_dict
                 # Use first object as fallback if no object with the default language is available
                 elif fallback == '':
                     fallback = str(o)
@@ -558,6 +573,41 @@ class RDFProfile(object):
                 else:
                     tag_val = f'{dataset_tag_base}/dataset/?tags={label}'
                 g.add((dataset_ref, dcat_property, URIRefOrLiteral(tag_val)))
+
+    def dict_to_list(value):
+        """Converts a dictionary to a list of its values.
+
+        Args:
+            value: The value to convert.
+
+        Returns:
+            If the value is a dictionary, returns a list of its values. Otherwise, returns the value unchanged.
+        """
+        if isinstance(value, dict):
+            value = list(value.values())
+        return value
+
+    def _get_localized_dataset_value(multilang_dict, default=None):
+        """Returns a localized dataset multilang_dict.
+
+        Args:
+            multilang_dict: A string or dictionary representing the multilang_dict to localize.
+            default: A default value to return if the multilang_dict cannot be localized.
+
+        Returns:
+            A dictionary representing the localized multilang_dict, or the default value if the multilang_dict cannot be localized.
+
+        Raises:
+            None.
+        """
+        if isinstance(multilang_dict, dict):
+            return multilang_dict
+
+        if isinstance(multilang_dict, str):
+            try:
+                multilang_dict = json.loads(multilang_dict)
+            except ValueError:
+                return default
 
     def _search_value_codelist(self, metadata_codelist, label, input_field_name, output_field_name, return_value=True):
         """Searches for a value in a metadata codelist.
@@ -881,22 +931,34 @@ class RDFProfile(object):
 
     def _add_triples_from_dict(self, _dict, subject, items,
                                list_value=False,
-                               date_value=False):
+                               date_value=False,
+                               multilang=False):
         for item in items:
-            key, predicate, fallbacks, _type = item
+            if len(item) == 5:
+                key, predicate, fallbacks, _type, required_lang = item
+            else:
+                key, predicate, fallbacks, _type = item
+                required_lang = None
+
+            predicate = URIRef(predicate)
+
             self._add_triple_from_dict(_dict, subject, predicate, key,
-                                       fallbacks=fallbacks,
-                                       list_value=list_value,
-                                       date_value=date_value,
-                                       _type=_type)
+                                    fallbacks=fallbacks,
+                                    list_value=list_value,
+                                    date_value=date_value,
+                                    multilang=multilang,
+                                    _type=_type,
+                                    required_lang=required_lang)
 
     def _add_triple_from_dict(self, _dict, subject, predicate, key,
                               fallbacks=None,
                               list_value=False,
                               date_value=False,
+                              multilang=False,
                               _type=Literal,
                               _datatype=None,
-                              value_modifier=None):
+                              value_modifier=None,
+                              required_lang= None):
         '''
         Adds a new triple to the graph with the provided parameters
 
@@ -928,6 +990,9 @@ class RDFProfile(object):
             self._add_list_triple(subject, predicate, value, _type, _datatype)
         elif value and date_value:
             self._add_date_triple(subject, predicate, value, _type)
+        # if multilang is True, the value is a dict with language codes as keys
+        elif value and multilang:
+            self._add_multilang_triple(subject, predicate, value, required_lang)
         elif value:
             # Normal text value
             # ensure URIRef items are preprocessed (space removal/url encoding)
@@ -938,6 +1003,29 @@ class RDFProfile(object):
             else:
                 object = _type(value)
             self.g.add((subject, predicate, object))
+
+    def _add_multilang_triple(self, subject, predicate, multilang_values, required_lang=None):
+        #log.debug('multilang_values: {0}'.format(multilang_values))
+
+        if not multilang_values:
+            return
+
+        if isinstance(multilang_values, str):
+            try:
+                multilang_values = json.loads(multilang_values)
+            except ValueError:
+                pass
+
+        if isinstance(multilang_values, dict):
+            try:
+                for key, value in multilang_values.items():
+                    if value and (not required_lang or key == required_lang):
+                        self.g.add((subject, predicate, Literal(value, lang=key)))
+            except (ValueError, KeyError):
+                self.g.add((subject, predicate, Literal(multilang_values)))
+
+        else:
+            self.g.add((subject, predicate, Literal(multilang_values)))
 
     def _add_list_triple(self, subject, predicate, value, _type=Literal, _datatype=None):
         '''
@@ -1235,6 +1323,13 @@ class EuropeanDCATAPProfile(RDFProfile):
         dataset_dict['extras'] = []
         dataset_dict['resources'] = []
 
+        # Translated fields
+        for key, field in default_translated_fields.items():
+            predicate = field['rdf_predicate']
+            value = self._object_value(dataset_ref, predicate, True)
+            if value:
+                dataset_dict[field['field_name']] = value
+
         # Basic fields
         for key, predicate in (
                 ('title', DCT.title),
@@ -1454,28 +1549,35 @@ class EuropeanDCATAPProfile(RDFProfile):
 
         g.add((dataset_ref, RDF.type, DCAT.Dataset))
 
+        # Translated fields
+        items = [(
+            default_translated_fields[key]['field_name'],
+            default_translated_fields[key]['rdf_predicate'],
+            default_translated_fields[key]['fallbacks'],
+            default_translated_fields[key]['_type']
+            )
+            for key in default_translated_fields
+        ]
+        self._add_triples_from_dict(dataset_dict, dataset_ref, items, multilang=True)
+
         # Basic fields
         items = [
-            ('title', DCT.title, None, Literal),
             ('encoding', CNT.characterEncoding, None, Literal),
-            ('notes', DCT.description, None, Literal),
             ('url', DCAT.landingPage, None, URIRef),
             ('identifier', DCT.identifier, ['guid', 'id'], URIRefOrLiteral),
             ('version', OWL.versionInfo, ['dcat_version'], Literal),
-            ('version_notes', ADMS.versionNotes, None, Literal),
             ('frequency', DCT.accrualPeriodicity, None, URIRefOrLiteral),
             ('dcat_type', DCT.type, None, URIRefOrLiteral),
-            ('provenance', RDFS.label, None, Literal),
             ('topic', DCAT.keyword, None, URIRefOrLiteral),
         ]
         self._add_triples_from_dict(dataset_dict, dataset_ref, items)
 
         # Access Rights
         # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
-        if self._get_dataset_value(dataset_dict, 'access_rights'):
+        if self._get_dataset_value(dataset_dict, 'access_rights') and 'authority/access-right' in self._get_dataset_value(dataset_dict, 'access_rights'):
                 g.add((dataset_ref, DCT.accessRights, URIRef(self._get_dataset_value(dataset_dict, 'access_rights'))))
         else:
-            g.add((dataset_ref, DCT.accessRights, URIRef("http://publications.europa.eu/resource/authority/access-right/PUBLIC")))
+            g.add((dataset_ref, DCT.accessRights, URIRef(euro_dcat_ap_default_values['access_rights'])))
             
         # Tags
         # Pre-process keywords inside INSPIRE MD Codelists and update dataset_dict
@@ -1554,7 +1656,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 _type=URIRef)
             
             # Add contact role
-            g.add((contact_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/pointOfContact")))
+            g.add((contact_details, VCARD.role, URIRef(euro_dcat_ap_default_values['contact_role'])))
 
         # Resource maintainer/contact 
         if any([
@@ -1590,7 +1692,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 _type=URIRef)
 
             # Add maintainer role
-            g.add((maintainer_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/custodian")))
+            g.add((maintainer_details, VCARD.role, URIRef(euro_dcat_ap_default_values['maintainer_role'])))
 
         # Resource author
         if any([
@@ -1626,7 +1728,7 @@ class EuropeanDCATAPProfile(RDFProfile):
                 _type=URIRef)
 
             # Add author role
-            g.add((author_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/author")))
+            g.add((author_details, VCARD.role, URIRef(euro_dcat_ap_default_values['author_role'])))
 
         # Provenance: dataset dct:provenance dct:ProvenanceStatement
         provenance_details = dataset_ref + '/provenance'
@@ -1634,7 +1736,11 @@ class EuropeanDCATAPProfile(RDFProfile):
         if provenance_statement:
             g.add((dataset_ref, DCT.provenance, provenance_details))
             g.add((provenance_details, RDF.type, DCT.ProvenanceStatement))
-            g.add((provenance_details, RDFS.label, Literal(provenance_statement)))
+            
+            if isinstance(provenance_statement, dict):
+                self._add_multilang_triple(provenance_details, RDFS.label, provenance_statement)
+            else:
+                g.add((provenance_details, RDFS.label, Literal(provenance_statement)))
 
         # Publisher
         if any([
@@ -1677,7 +1783,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             ]
 
             # Add publisher role
-            g.add((publisher_details, VCARD.role, URIRef("http://inspire.ec.europa.eu/metadata-codelist/ResponsiblePartyRole/distributor")))
+            g.add((publisher_details, VCARD.role, URIRef(euro_dcat_ap_default_values['publisher_role'])))
 
             self._add_triples_from_dict(dataset_dict, publisher_details, items)
 
@@ -1716,7 +1822,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             crs_uri = self._get_dataset_value(dataset_dict, 'reference_system')
             crs_details = CleanedURIRef(crs_uri)
             g.add((crs_details, RDF.type, DCT.Standard))
-            g.add((crs_details, DCT.type, CleanedURIRef('http://inspire.ec.europa.eu/glossary/SpatialReferenceSystem')))
+            g.add((crs_details, DCT.type, CleanedURIRef(euro_dcat_ap_default_values['reference_system_type'])))
             g.add((dataset_ref, DCT.conformsTo, crs_details))
 
         # Use fallback license if set in config
@@ -1742,7 +1848,6 @@ class EuropeanDCATAPProfile(RDFProfile):
                 ('encoding', CNT.characterEncoding, None, Literal),
                 ('description', DCT.description, None, Literal),
                 ('status', ADMS.status, None, URIRefOrLiteral),
-                ('rights', DCT.rights, None, URIRefOrLiteral),
                 ('license', DCT.license, None, URIRefOrLiteral),
                 ('access_url', DCAT.accessURL, None, URIRef),
                 ('download_url', DCAT.downloadURL, None, URIRef),
@@ -1801,6 +1906,14 @@ class EuropeanDCATAPProfile(RDFProfile):
 
             self._add_date_triples_from_dict(resource_dict, distribution, items)
 
+            # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
+            access_rights = self._get_resource_value(resource_dict, 'rights')
+            if access_rights and 'authority/access-right' in access_rights:
+                access_rights_uri = URIRef(access_rights)
+            else:
+                access_rights_uri = URIRef(euro_dcat_ap_default_values['access_rights'])
+            g.add((distribution, DCT.rights, access_rights_uri))
+
             # Numbers
             if resource_dict.get('size'):
                 try:
@@ -1857,7 +1970,7 @@ class EuropeanDCATAPProfile(RDFProfile):
             ('conforms_to', DCT.conformsTo, euro_dcat_ap_default_values['conformance'], URIRef),
             ('access_rights', DCT.accessRights, access_rights, URIRefOrLiteral),
         ]
-         
+                 
         for item in items:
             key, predicate, fallback, _type = item
             value = catalog_dict.get(key, fallback) if catalog_dict else fallback
@@ -1979,7 +2092,7 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
 
         # call super method
         super(EuropeanDCATAP2Profile, self).graph_from_dataset(dataset_dict, dataset_ref)
-
+        
         # Lists
         for key, predicate, fallbacks, type, datatype in (
             ('temporal_resolution', DCAT.temporalResolution, None, Literal, XSD.duration),
@@ -2021,15 +2134,13 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
                     self.g.add((spatial_ref, DCAT.bbox, Literal(spatial_cent, datatype=GSP.geoJSONLiteral)))
 
         # Spatial resolution in meters
-        spatial_resolution_in_meters = self._read_list_value(
-            self._get_dataset_value(dataset_dict, 'spatial_resolution_in_meters'))
+        spatial_resolution_in_meters = self._get_dataset_value(dataset_dict, 'spatial_resolution_in_meters')
         if spatial_resolution_in_meters:
-            for value in spatial_resolution_in_meters:
-                try:
-                    self.g.add((dataset_ref, DCAT.spatialResolutionInMeters,
-                                Literal(float(value), datatype=XSD.decimal)))
-                except (ValueError, TypeError):
-                    self.g.add((dataset_ref, DCAT.spatialResolutionInMeters, Literal(value)))
+            try:
+                self.g.add((dataset_ref, DCAT.spatialResolutionInMeters,
+                            Literal(float(spatial_resolution_in_meters), datatype=XSD.decimal)))
+            except (ValueError, TypeError):
+                self.g.add((dataset_ref, DCAT.spatialResolutionInMeters, Literal(spatial_resolution_in_meters)))
 
         # Resources
         for resource_dict in dataset_dict.get('resources', []):
@@ -2067,7 +2178,6 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
                     items = [
                         ('availability', DCATAP.availability, None, URIRefOrLiteral),
                         ('license', DCT.license, None, URIRefOrLiteral),
-                        ('access_rights', DCT.accessRights, None, URIRefOrLiteral),
                         ('title', DCT.title, None, Literal),
                         ('endpoint_description', DCAT.endpointDescription, None, Literal),
                         ('description', DCT.description, None, Literal),
@@ -2081,6 +2191,14 @@ class EuropeanDCATAP2Profile(EuropeanDCATAPProfile):
                         ('serves_dataset', DCAT.servesDataset, None, URIRefOrLiteral),
                     ]
                     self._add_list_triples_from_dict(access_service_dict, access_service_node, items)
+
+                    # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
+                    access_rights = self._get_resource_value(resource_dict, 'access_rights')
+                    if access_rights and 'authority/access-right' in access_rights:
+                        access_rights_uri = URIRef(access_rights)
+                    else:
+                        access_rights_uri = URIRef(euro_dcat_ap_default_values['access_rights'])
+                    self.g.add((distribution, DCT.accessRights, access_rights_uri))
 
                 if access_service_list:
                     resource_dict['access_services'] = json.dumps(access_service_list)
@@ -2103,6 +2221,10 @@ class SpanishDCATProfile(EuropeanDCATAPProfile):
     More information and specification:
 
     https://datos.gob.es/es/documentacion/guia-de-aplicacion-de-la-norma-tecnica-de-interoperabilidad-de-reutilizacion-de
+    
+    https://datos.gob.es/es/documentacion/guias-de-datosgobes
+    
+    https://datos.gob.es/es/documentacion/norma-tecnica-de-interoperabilidad-de-reutilizacion-de-recursos-de-informacion
 
     '''
     def parse_dataset(self, dataset_dict, dataset_ref):
@@ -2140,13 +2262,6 @@ class SpanishDCATProfile(EuropeanDCATAPProfile):
         spatial = self._spatial(dataset_ref, DCT.spatial)
         for key in ('bbox', 'centroid'):
             self._add_spatial_to_dict(dataset_dict, key, spatial)
-
-        # Spatial resolution in meters
-        spatial_resolution_in_meters = self._object_value_int_list(
-            dataset_ref, DCAT.spatialResolutionInMeters)
-        if spatial_resolution_in_meters:
-            dataset_dict['extras'].append({'key': 'spatial_resolution_in_meters',
-                                           'value': json.dumps(spatial_resolution_in_meters)})
 
         # Resources
         for distribution in self._distributions(dataset_ref):
@@ -2230,9 +2345,21 @@ class SpanishDCATProfile(EuropeanDCATAPProfile):
 
         g.add((dataset_ref, RDF.type, DCAT.Dataset))
 
+        # Translated fields
+        items = [(
+            default_translated_fields[key]['field_name'],
+            default_translated_fields[key]['rdf_predicate'],
+            default_translated_fields[key]['fallbacks'],
+            default_translated_fields[key]['_type'],
+            default_translated_fields[key]['required_lang']
+            )
+            for key in default_translated_fields_spain_dcat
+        ]
+        self._add_triples_from_dict(dataset_dict, dataset_ref, items, multilang=True)
+
+
         # Basic elements (Title, description, Dates)
         basic_elements = [
-            ('title', DCT.title, None, Literal),
             ('url', DCAT.landingPage, None, URIRef),
         ]
         
@@ -2282,13 +2409,6 @@ class SpanishDCATProfile(EuropeanDCATAPProfile):
 
         # Temporal - Cobertura temporal
         self._temporal_graph(dataset_dict, dataset_ref)
-
-        # DCAT-AP Extension
-        geodcatap_items = {
-            'access_rights': (DCT.accessRights, spain_dcat_default_values['access_rights']),
-        }
-
-        self._add_dataset_triples_from_dict(dataset_dict, dataset_ref, geodcatap_items)    
     
         # Use fallback license if set in config
         resource_license_fallback = None
@@ -2297,7 +2417,7 @@ class SpanishDCATProfile(EuropeanDCATAPProfile):
                 resource_license_fallback = dataset_dict['license_id']
             elif 'license_url' in dataset_dict and isinstance(URIRefOrLiteral(dataset_dict['license_url']), URIRef):
                 resource_license_fallback = dataset_dict['license_url']
-    
+        
         # Resources
         for resource_dict in dataset_dict.get('resources', []):
 
@@ -2513,6 +2633,32 @@ class SpanishDCATAPProfile(SpanishDCATProfile):
         # call super method
         super(SpanishDCATAPProfile, self).parse_dataset(dataset_dict, dataset_ref)
 
+        # Basic fields
+        for key, predicate in (
+                ('access_rights', DCT.accessRights),
+                ('availability', DCATAP.availability),
+                ):
+            value = self._object_value(dataset_ref, predicate)
+            if value:
+                dataset_dict[key] = value
+
+        # Lists
+        for key, predicate in (
+            ('temporal_resolution', DCAT.temporalResolution),
+            ('is_referenced_by', DCT.isReferencedBy),
+        ):
+            values = self._object_value_list(dataset_ref, predicate)
+            if values:
+                dataset_dict['extras'].append({'key': key,
+                                               'value': json.dumps(values)})
+
+        # Spatial resolution in meters
+        spatial_resolution_in_meters = self._object_value_int_list(
+            dataset_ref, DCAT.spatialResolutionInMeters)
+        if spatial_resolution_in_meters:
+            dataset_dict['extras'].append({'key': 'spatial_resolution_in_meters',
+                                           'value': json.dumps(spatial_resolution_in_meters)})
+
     def graph_from_dataset(self, dataset_dict, dataset_ref):
         """
         Generates an RDF graph from a dataset dictionary.
@@ -2527,6 +2673,37 @@ class SpanishDCATAPProfile(SpanishDCATProfile):
         
         # call super method
         super(SpanishDCATAPProfile, self).graph_from_dataset(dataset_dict, dataset_ref)
+
+        # DCAT-AP Extension
+        geodcatap_items = {
+            'availability': (DCATAP.availability, spain_dcat_default_values['availability']),
+        }
+
+        self._add_dataset_triples_from_dict(dataset_dict, dataset_ref, geodcatap_items)    
+
+        # Lists
+        for key, predicate in (
+            ('is_referenced_by', DCT.isReferencedBy),
+        ):
+            values = self._object_value_list(dataset_ref, predicate)
+            if values:
+                dataset_dict['extras'].append({'key': key,
+                                               'value': json.dumps(values)})
+        # Spatial resolution in meters
+        spatial_resolution_in_meters = self._get_dataset_value(dataset_dict, 'spatial_resolution_in_meters')
+        if spatial_resolution_in_meters:
+            try:
+                self.g.add((dataset_ref, DCAT.spatialResolutionInMeters,
+                            Literal(float(spatial_resolution_in_meters), datatype=XSD.decimal)))
+            except (ValueError, TypeError):
+                self.g.add((dataset_ref, DCAT.spatialResolutionInMeters, Literal(spatial_resolution_in_meters)))
+
+        # Access Rights
+        # DCAT-AP: http://publications.europa.eu/en/web/eu-vocabularies/at-dataset/-/resource/dataset/access-right
+        if self._get_dataset_value(dataset_dict, 'access_rights') and 'authority/access-right' in self._get_dataset_value(dataset_dict, 'access_rights'):
+                self.g.add((dataset_ref, DCT.accessRights, URIRef(self._get_dataset_value(dataset_dict, 'access_rights'))))
+        else:
+            self.g.add((dataset_ref, DCT.accessRights, URIRef(euro_dcat_ap_default_values['access_rights'])))
 
     def graph_from_catalog(self, catalog_dict, catalog_ref):
         """

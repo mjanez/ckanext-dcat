@@ -454,3 +454,7 @@ def read_catalog_page(_format):
 
 def get_endpoint(_type='dataset'):
     return 'dcat.read_dataset' if _type == 'dataset' else 'dcat.read_catalog'
+
+def get_langs():
+    language_priorities = config.get('ckan.locales_offered', '').split()
+    return language_priorities
