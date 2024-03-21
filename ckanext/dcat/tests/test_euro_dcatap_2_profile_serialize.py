@@ -307,6 +307,49 @@ class TestEuroDCATAP2ProfileSerializeDataset(BaseSerializeTest):
                 triples.extend(self._triples(g, temporal_obj, predicate, parse_date(extras['temporal_end']).isoformat(), XSD.dateTime))
             assert len(triples) == 1
 
+    def test_high_value_datasets(self):
+        """
+        Tests that the HVD information properties are included in the graph.
+        """
+
+        resource = {
+            'id': 'c041c635-054f-4431-b647-f9186926d021',
+            'package_id': '4b6fe9ca-dc77-4cec-92a4-55c6624a5bd6',
+            'name': 'Distribution name',
+            'applicable_legislation': json.dumps(['http://data.europa.eu/eli/reg_impl/2023/138/oj', 'http://data.europa.eu/eli/reg_impl/2023/138/oj_alt']),
+        }
+
+        dataset = {
+            'id': '4b6fe9ca-dc77-4cec-92a4-55c6624a5bd6',
+            'name': 'test-dataset',
+            'extras': [
+                {'key': 'applicable_legislation', 'value': '[\"http://data.europa.eu/eli/reg_impl/2023/138/oj\", \"http://data.europa.eu/eli/reg_impl/2023/138/oj_alt\"]'},
+                {'key': 'hvd_category', 'value': '[\"http://data.europa.eu/bna/c_164e0bf5\", \"http://data.europa.eu/bna/c_ac64a52d\"]'},
+            ],
+            'resources': [
+                resource
+            ]
+        }
+        extras = self._extras(dataset)
+
+        s = RDFSerializer(profiles=DCAT_AP_PROFILES)
+        g = s.g
+
+        dataset_ref = s.graph_from_dataset(dataset)
+
+        values = json.loads(extras['applicable_legislation'])
+        assert len([t for t in g.triples((dataset_ref, DCATAP.applicableLegislation, None))]) == len(values)
+        assert self._triple(g, dataset_ref, DCATAP.applicableLegislation, URIRef(values[0]))
+
+        values = json.loads(extras['hvd_category'])
+        assert len([t for t in g.triples((dataset_ref, DCATAP.hvdCategory, None))]) == len(values)
+        assert self._triple(g, dataset_ref, DCATAP.hvdCategory, URIRef(values[0]))
+
+        distribution = self._triple(g, dataset_ref, DCAT.distribution, None)[2]
+        self._assert_values_list(g, distribution, DCATAP.applicableLegislation,
+                               self._get_typed_list(json.loads(resource['applicable_legislation']), URIRef))
+
+
     def test_distribution_fields(self):
 
         resource = {
@@ -541,6 +584,51 @@ class TestEuroDCATAP2ProfileSerializeDataset(BaseSerializeTest):
         object_list = [t for t in g.triples((distribution, DCAT.accessService, None))]
         assert len(object_list) == 0
         assert 'access_services' not in dataset['resources'][0]
+
+    def test_access_services_list_values_only(self):
+
+        resource = {
+            'id': 'c041c635-054f-4431-b647-f9186926d021',
+            'package_id': '4b6fe9ca-dc77-4cec-92a4-55c6624a5bd6',
+            'name': 'Distribution name',
+            'access_services': json.dumps([
+                {
+                    'endpoint_url': ['http://publications.europa.eu/webapi/rdf/sparql'],
+                    'serves_dataset': ['http://data.europa.eu/88u/dataset/eu-whoiswho-the-official-directory-of-the-european-union']
+                }
+            ])
+        }
+
+        dataset = {
+            'id': '4b6fe9ca-dc77-4cec-92a4-55c6624a5bd6',
+            'name': 'test-dataset',
+            'title': 'Test DCAT dataset',
+            'resources': [
+                resource
+            ]
+        }
+
+        s = RDFSerializer(profiles=DCAT_AP_PROFILES)
+        g = s.g
+
+        dataset_ref = s.graph_from_dataset(dataset)
+
+        assert len([t for t in g.triples((dataset_ref, DCAT.distribution, None))]) == 1
+
+        distribution = self._triple(g, dataset_ref, DCAT.distribution, None)[2]
+
+        assert len([t for t in g.triples((distribution, DCAT.accessService, None))]) == 1
+
+        # Access services
+        access_service_object = self._triple(g, distribution, DCAT.accessService, None)[2]
+
+        access_services = json.loads(resource['access_services'])
+
+        # Lists
+        self._assert_values_list(g, access_service_object, DCAT.endpointURL,
+                            self._get_typed_list(access_services[0].get('endpoint_url'), URIRef))
+        self._assert_values_list(g, access_service_object, DCAT.servesDataset,
+                            self._get_typed_list(access_services[0].get('serves_dataset'), URIRef))
 
     def _assert_simple_value(self, graph, object, predicate, value):
         """
