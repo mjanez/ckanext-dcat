@@ -30,7 +30,7 @@ euro_dcat_ap_default_values: dict
     A dictionary containing the default values for the EuropeanDCATAPProfile.
     
 default_translated_fields: dict
-    A dictionary containing the default translated fields for the ckanext-scheming_dcat extension.
+    A dictionary containing the default translated fields for the ckanext-schemingdcat extension.
 """
 
 # DCAT default elements by profile
@@ -90,7 +90,7 @@ euro_dcat_ap_default_values = {
     'spatial_uri': 'http://publications.europa.eu/resource/authority/country/ESP',
 }
 
-# Default field_names to translated fields mapping (ckanext.scheming_dcat:schemas)
+# Default field_names to translated fields mapping (ckanext.schemingdcat:schemas)
 default_translated_fields = {
     'title': 
         {

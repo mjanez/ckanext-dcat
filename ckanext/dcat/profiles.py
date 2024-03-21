@@ -23,7 +23,7 @@ from ckan.lib.munge import munge_tag
 from ckanext.dcat.utils import resource_uri, publisher_uri_organization_fallback, DCAT_EXPOSE_SUBCATALOGS, DCAT_CLEAN_TAGS, get_langs
 import re
 import logging
-from ckanext.scheming_dcat.helpers import schemingdct_get_default_lang
+from ckanext.schemingdcat.helpers import schemingdcat_get_default_lang
 
 # Default values
 from ckanext.dcat.profiles_default import metadata_field_names, spain_dcat_default_values, euro_dcat_ap_default_values, default_translated_fields, default_translated_fields_spain_dcat
@@ -77,7 +77,7 @@ PREFIX_MAILTO = u'mailto:'
 
 DISTRIBUTION_LICENSE_FALLBACK_CONFIG = 'ckanext.dcat.resource.inherit.license'
 
-DEFAULT_LANG = schemingdct_get_default_lang()
+DEFAULT_LANG = schemingdcat_get_default_lang()
 
 log = logging.getLogger(__name__)
 
