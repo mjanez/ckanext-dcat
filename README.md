@@ -11,7 +11,7 @@ This extension provides plugins that allow CKAN to expose and consume metadata f
 
 It also offers other features related to Semantic Data like exposing the necessary markup to get your datasets indexed in [Google Dataset Search](https://toolbox.google.com/datasetsearch).
 
->**Warning**
+> [!IMPORTANT]
 > * Custom extension designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
 >*  Contains [custom profiles](#custom-profiles) as `euro_dcat_ap_2`, `spain_dcat` or `spain_dcat_ap` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
 
