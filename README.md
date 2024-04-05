@@ -11,7 +11,7 @@ This extension provides plugins that allow CKAN to expose and consume metadata f
 
 It also offers other features related to Semantic Data like exposing the necessary markup to get your datasets indexed in [Google Dataset Search](https://toolbox.google.com/datasetsearch).
 
->**Warning**
+> [!IMPORTANT]
 > * Custom extension designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
 >*  Contains [custom profiles](#custom-profiles) as `euro_dcat_ap_2`, `spain_dcat` or `spain_dcat_ap` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
 
@@ -182,10 +182,9 @@ The number of datasets returned is limited. The response will include paging inf
     @prefix hydra: <http://www.w3.org/ns/hydra/core#> .
 
     <http://example.com/catalog.ttl?page=1> a hydra:PagedCollection ;
-        hydra:firstPage "http://example.com/catalog.ttl?page=1" ;
-        hydra:itemsPerPage 100 ;
-        hydra:lastPage "http://example.com/catalog.ttl?page=3" ;
-        hydra:nextPage "http://example.com/catalog.ttl?page=2" ;
+        hydra:first "http://example.com/catalog.ttl?page=1" ;
+        hydra:last "http://example.com/catalog.ttl?page=3" ;
+        hydra:next "http://example.com/catalog.ttl?page=2" ;
         hydra:totalItems 283 .
 
 The default number of datasets returned (100) can be modified by CKAN site maintainers using the following configuration option on your ini file:
