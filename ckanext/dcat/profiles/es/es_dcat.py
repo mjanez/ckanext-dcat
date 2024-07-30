@@ -6,8 +6,8 @@ from ckantoolkit import config, asbool, get_action
 from ckanext.dcat.utils import (
     resource_uri,
 )
-from .base import RDFProfile, URIRefOrLiteral, CleanedURIRef
-from .base import (
+from ..base import RDFProfile, URIRefOrLiteral, CleanedURIRef
+from ..base import (
     RDF,
     RDFS,
     DCAT,
@@ -22,7 +22,7 @@ from .base import (
     DISTRIBUTION_LICENSE_FALLBACK_CONFIG
 )
 
-from .euro_dcat_ap import EuropeanDCATAPProfile
+from ..euro_dcat_ap import EuropeanDCATAPProfile
 
 # Default values
 from ckanext.dcat.profiles.default_config import default_translated_fields_spain_dcat, default_translated_fields, spain_dcat_default_values

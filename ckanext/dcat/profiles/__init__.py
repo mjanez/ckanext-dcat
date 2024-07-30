@@ -22,5 +22,5 @@ from .euro_dcat_ap import EuropeanDCATAPProfile
 from .euro_dcat_ap_2 import EuropeanDCATAP2Profile
 from .euro_dcat_ap_scheming import EuropeanDCATAPSchemingProfile
 from .schemaorg import SchemaOrgProfile
-from .spain_dcat import SpanishDCATProfile
-from .es_dcat_ap_2 import SpanishDCATAPProfile
+from .es.es_dcat import SpanishDCATProfile
+from .es.es_dcat_ap_2 import SpanishDCATAP2Profile
