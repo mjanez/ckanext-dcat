@@ -20,6 +20,7 @@ from .base import (
 
 from .euro_dcat_ap import EuropeanDCATAPProfile
 from .euro_dcat_ap_2 import EuropeanDCATAP2Profile
+from .euro_dcat_ap_scheming import EuropeanDCATAPSchemingProfile
 from .schemaorg import SchemaOrgProfile
 from .spain_dcat import SpanishDCATProfile
-from .spain_dcat_ap import SpanishDCATAPProfile
+from .es_dcat_ap_2 import SpanishDCATAPProfile

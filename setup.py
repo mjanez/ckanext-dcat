@@ -43,9 +43,18 @@ setup(
     [ckan.rdf.profiles]
     euro_dcat_ap=ckanext.dcat.profiles:EuropeanDCATAPProfile
     euro_dcat_ap_2=ckanext.dcat.profiles:EuropeanDCATAP2Profile
+    euro_dcat_ap_scheming=ckanext.dcat.profiles:EuropeanDCATAPSchemingProfile
+    schemaorg=ckanext.dcat.profiles:SchemaOrgProfile
+    
+    # Old Spanish profiles
     spain_dcat=ckanext.dcat.profiles:SpanishDCATProfile
     spain_dcat_ap=ckanext.dcat.profiles:SpanishDCATAPProfile
-    schemaorg=ckanext.dcat.profiles:SchemaOrgProfile
+
+    ## New Spanish profiles
+    es_dcat=ckanext.dcat.profiles:SpanishDCATProfile
+    es_dcat_ap_2=ckanext.dcat.profiles:SpanishDCATAP2Profile
+    #es_geodcat_ap_3=ckanext.dcat.profiles:SpanishGeoDCATAP3Profile
+    #es_dcat_ap_3=ckanext.dcat.profiles:SpanishDCATAP3Profile
 
     [babel.extractors]
     ckan = ckan.lib.extract:extract_ckan

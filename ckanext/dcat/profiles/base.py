@@ -7,10 +7,11 @@ from rdflib import term, URIRef, BNode, Literal
 from rdflib.namespace import Namespace, RDF, XSD, SKOS, RDFS
 from geomet import wkt, InvalidGeoJSONException
 
-from ckantoolkit import config, asbool, get_action
+from ckantoolkit import config, url_for, asbool, aslist, get_action, ObjectNotFound
 from ckan.model.license import LicenseRegister
 from ckan.lib.helpers import resource_formats
 from ckanext.dcat.utils import DCAT_EXPOSE_SUBCATALOGS
+from ckanext.dcat.validators import is_year, is_year_month, is_date
 
 from ckan.lib.helpers import resource_formats
 from ckanext.dcat.utils import DCAT_EXPOSE_SUBCATALOGS, get_langs
@@ -66,11 +67,26 @@ namespaces = {
     'spdx': SPDX,
 }
 
-PREFIX_MAILTO = u'mailto:'
+PREFIX_MAILTO = 'mailto:'
 
 DISTRIBUTION_LICENSE_FALLBACK_CONFIG = 'ckanext.dcat.resource.inherit.license'
 
 DEFAULT_LANG = schemingdcat_get_default_lang()
+
+DEFAULT_SPATIAL_FORMATS = ["wkt"]
+
+ROOT_DATASET_FIELDS = [
+    'name',
+    'title',
+    'url',
+    'version',
+    'tags',
+    'license_id',
+    'maintainer',
+    'maintainer_email',
+    'author',
+    'author_email',
+]
 
 log = logging.getLogger(__name__)
 
@@ -134,11 +150,20 @@ class RDFProfile(object):
        custom profiles
     '''
 
-    def __init__(self, graph, compatibility_mode=False):
+    _dataset_schema = None
+
+    # Cache for mappings of licenses URL/title to ID built when needed in
+    # _license().
+    _licenceregister_cache = None
+
+    # Cache for organization_show details (used for publisher fallback)
+    _org_cache: dict = {}
+
+    def __init__(self, graph, dataset_type="dataset", compatibility_mode=False):
         '''Class constructor
-
         Graph is an rdflib.Graph instance.
-
+        A scheming dataset type can be provided, in which case the scheming schema
+        will be loaded so it can be used by profiles.
         In compatibility mode, some fields are modified to maintain
         compatibility with previous versions of the ckanext-dcat parsers
         (eg adding the `dcat_` prefix or storing comma separated lists instead
@@ -149,9 +174,17 @@ class RDFProfile(object):
 
         self.compatibility_mode = compatibility_mode
 
-        # Cache for mappings of licenses URL/title to ID built when needed in
-        # _license().
-        self._licenceregister_cache = None
+        try:
+            schema_show = get_action("scheming_dataset_schema_show")
+            try:
+                schema = schema_show({}, {"type": dataset_type})
+            except ObjectNotFound:
+                raise ObjectNotFound(f"Unknown dataset schema: {dataset_type}")
+
+            self._dataset_schema = schema
+
+        except KeyError:
+            pass
 
     def _datasets(self):
         '''
@@ -841,7 +874,7 @@ class RDFProfile(object):
         # List of values
         if isinstance(value, list):
             items = value
-        elif isinstance(value, str):
+        elif value and isinstance(value, str):
             try:
                 items = json.loads(value)
                 if isinstance(items, ((int, float, complex))):
@@ -854,68 +887,165 @@ class RDFProfile(object):
                     items = [value]  # Normal text value
         return items
 
-    def _add_geojson_value_to_graph(self, spatial_ref, predicate, value):
-        '''
-        Adds GeoJSON spatial triples to the graph.
-        '''
-        self.g.add((spatial_ref,
-                    predicate,
-                    Literal(value, datatype=GEOJSON_IMT)))
-
-    def _add_wkt_or_geojson_value_to_graph(self, spatial_ref, predicate, value):
+    def _add_spatial_value_to_graph(self, spatial_ref, predicate, value):
         """
-        Adds a WKT or GeoJSON value to an RDF graph.
-
-        Args:
-            spatial_ref: The RDF subject reference.
-            predicate: The RDF predicate for the spatial data.
-            value: The GeoJSON or GeoJSON string to be added.
-
-        Note:
-            This function will first attempt to add the value as a WKT and, if unsuccessful, add it as a GeoJSON literal, to comply with GeoDCAT-AP, which states that the geometries MAY be provided in multiple encodings, but at least one of the following MUST be provided GML and WKT.(https://semiceu.github.io/GeoDCAT-AP/drafts/latest/#bounding-box)
-
-        Raises:
-            TypeError: If the input value is of an unsupported type.
-            ValueError: If there's an error in converting GeoJSON to WKT.
-            InvalidGeoJSONException: If the GeoJSON is invalid.
+        Adds spatial triples to the graph. Assumes that value is a GeoJSON string
+        or object.
         """
-        try:
-            if isinstance(value, str):
-                # Try to parse the input as a GeoJSON string
-                geojson_obj = json.loads(value)
-            else:
-                geojson_obj = value
+        spatial_formats = aslist(
+            config.get(
+                "ckanext.dcat.output_spatial_format", DEFAULT_SPATIAL_FORMATS
+            )
+        )
 
-            # Attempt to convert the GeoJSON object to WKT with 4 decimals
-            wkt_string = wkt.dumps(geojson_obj, decimals=4)
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (TypeError, ValueError):
+                return
 
-            # Create a Literal with the WKT representation and add it to the RDF graph
-            wkt_literal = Literal(wkt_string, datatype=GSP.wktLiteral)
-            self.g.add((spatial_ref, predicate, wkt_literal))
-            
-        except (TypeError, ValueError, InvalidGeoJSONException):
-            # If WKT conversion fails, add the value as a GeoJSON literal
-            geojson_literal = Literal(value, datatype=GSP.geoJSONLiteral)
-            self.g.add((spatial_ref, predicate, geojson_literal))
-
-    def _add_wkt_value_to_graph(self, spatial_ref, predicate, value):
-        '''
-        Adds WKT spatial triples to the graph.
-        '''
-        try:
-            self.g.add((spatial_ref,
+        if "wkt" in spatial_formats:
+            # WKT, because GeoDCAT-AP says so
+            try:
+                self.g.add(
+                    (
+                        spatial_ref,
                         predicate,
-                        Literal(wkt.dumps(json.loads(value),
-                                            decimals=4),
-                                datatype=GSP.wktLiteral)))
-        except (TypeError, ValueError, InvalidGeoJSONException):
-            pass
+                        Literal(
+                            wkt.dumps(value, decimals=4),
+                            datatype=GSP.wktLiteral,
+                        ),
+                    )
+                )
+            except (TypeError, ValueError, InvalidGeoJSONException):
+                pass
+
+        if "geojson" in spatial_formats:
+            # GeoJSON
+            self.g.add((spatial_ref, predicate, Literal(json.dumps(value), datatype=GEOJSON_IMT)))
+
 
     def _add_spatial_to_dict(self, dataset_dict, key, spatial):
         if spatial.get(key):
             dataset_dict['extras'].append(
                 {'key': 'spatial_{0}'.format(key) if key != 'geom' else 'spatial',
                  'value': spatial.get(key)})
+
+    def _schema_field(self, key):
+        """
+        Returns the schema field information if the provided key exists as a field in
+        the dataset schema (if one was provided)
+        """
+        if not self._dataset_schema:
+            return None
+
+        for field in self._dataset_schema["dataset_fields"]:
+            if field["field_name"] == key:
+                return field
+
+    def _schema_resource_field(self, key):
+        """
+        Returns the schema field information if the provided key exists as a field in
+        the resources fields of the dataset schema (if one was provided)
+        """
+        if not self._dataset_schema:
+            return None
+
+        for field in self._dataset_schema["resource_fields"]:
+            if field["field_name"] == key:
+                return field
+
+    def _set_dataset_value(self, dataset_dict, key, value):
+        """
+        Sets the value for a given key in a CKAN dataset dict
+        If a dataset schema was provided, the schema will be checked to see if
+        a custom field is present for the key. If so the key will be stored at
+        the dict root level, otherwise it will be stored as an extra.
+        Standard CKAN fields (defined in ROOT_DATASET_FIELDS) are always stored
+        at the root level.
+        """
+        if self._schema_field(key) or key in ROOT_DATASET_FIELDS:
+            dataset_dict[key] = value
+        else:
+            if not dataset_dict.get("extras"):
+                dataset_dict["extras"] = []
+            dataset_dict["extras"].append({"key": key, "value": value})
+
+        return dataset_dict
+
+    def _set_list_dataset_value(self, dataset_dict, key, value):
+        schema_field = self._schema_field(key)
+        if schema_field and "scheming_multiple_text" in schema_field["validators"]:
+            return self._set_dataset_value(dataset_dict, key, value)
+        else:
+            return self._set_dataset_value(dataset_dict, key, json.dumps(value))
+
+    def _set_list_resource_value(self, resource_dict, key, value):
+        schema_field = self._schema_resource_field(key)
+        if schema_field and "scheming_multiple_text" in schema_field["validators"]:
+            resource_dict[key] = value
+        else:
+            resource_dict[key] = json.dumps(value)
+
+        return resource_dict
+
+    def _schema_field(self, key):
+        """
+        Returns the schema field information if the provided key exists as a field in
+        the dataset schema (if one was provided)
+        """
+        if not self._dataset_schema:
+            return None
+
+        for field in self._dataset_schema["dataset_fields"]:
+            if field["field_name"] == key:
+                return field
+
+    def _schema_resource_field(self, key):
+        """
+        Returns the schema field information if the provided key exists as a field in
+        the resources fields of the dataset schema (if one was provided)
+        """
+        if not self._dataset_schema:
+            return None
+
+        for field in self._dataset_schema["resource_fields"]:
+            if field["field_name"] == key:
+                return field
+
+    def _set_dataset_value(self, dataset_dict, key, value):
+        """
+        Sets the value for a given key in a CKAN dataset dict
+        If a dataset schema was provided, the schema will be checked to see if
+        a custom field is present for the key. If so the key will be stored at
+        the dict root level, otherwise it will be stored as an extra.
+        Standard CKAN fields (defined in ROOT_DATASET_FIELDS) are always stored
+        at the root level.
+        """
+        if self._schema_field(key) or key in ROOT_DATASET_FIELDS:
+            dataset_dict[key] = value
+        else:
+            if not dataset_dict.get("extras"):
+                dataset_dict["extras"] = []
+            dataset_dict["extras"].append({"key": key, "value": value})
+
+        return dataset_dict
+
+    def _set_list_dataset_value(self, dataset_dict, key, value):
+        schema_field = self._schema_field(key)
+        if schema_field and "scheming_multiple_text" in schema_field["validators"]:
+            return self._set_dataset_value(dataset_dict, key, value)
+        else:
+            return self._set_dataset_value(dataset_dict, key, json.dumps(value))
+
+    def _set_list_resource_value(self, resource_dict, key, value):
+        schema_field = self._schema_resource_field(key)
+        if schema_field and "scheming_multiple_text" in schema_field["validators"]:
+            resource_dict[key] = value
+        else:
+            resource_dict[key] = json.dumps(value)
+
+        return resource_dict
 
     def _get_dataset_value(self, dataset_dict, key, default=None):
         '''
@@ -1063,21 +1193,31 @@ class RDFProfile(object):
         '''
         Adds a new triple with a date object
 
-        Dates are parsed using dateutil, and if the date obtained is correct,
-        added to the graph as an XSD.dateTime value.
+        If the value is one of xsd:gYear, xsd:gYearMonth or xsd:date. If not
+        the value will be parsed using dateutil, and if the date obtained is correct,
+        added to the graph as an xsd:dateTime value.
 
         If there are parsing errors, the literal string value is added.
         '''
         if not value:
             return
-        try:
-            default_datetime = datetime.datetime(1, 1, 1, 0, 0, 0)
-            _date = parse_date(value, default=default_datetime)
 
-            self.g.add((subject, predicate, _type(_date.isoformat(),
-                                                  datatype=XSD.dateTime)))
-        except ValueError:
-            self.g.add((subject, predicate, _type(value)))
+        if is_year(value):
+            self.g.add((subject, predicate, _type(value, datatype=XSD.gYear)))
+        elif is_year_month(value):
+            self.g.add((subject, predicate, _type(value, datatype=XSD.gYearMonth)))
+        elif is_date(value):
+            self.g.add((subject, predicate, _type(value, datatype=XSD.date)))
+        else:
+            try:
+                default_datetime = datetime.datetime(1, 1, 1, 0, 0, 0)
+                _date = parse_date(value, default=default_datetime)
+
+                self.g.add(
+                    (subject, predicate, _type(_date.isoformat(), datatype=XSD.dateTime))
+                )
+            except ValueError:
+                self.g.add((subject, predicate, _type(value)))
 
     def _get_catalog_field(self, field_name, default_values_dict=euro_dcat_ap_default_values, fallback=None, return_none=False, order='desc'):
         '''
@@ -1203,7 +1343,7 @@ class RDFProfile(object):
         Ensures that the mail address string has no mailto: prefix.
         '''
         if mail_addr:
-            return str(mail_addr).replace(PREFIX_MAILTO, u'')
+            return str(mail_addr).replace(PREFIX_MAILTO, "")
         else:
             return mail_addr
 

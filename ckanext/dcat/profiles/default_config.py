@@ -50,6 +50,10 @@ metadata_field_names = {
     'spain_dcat': {
         'theme': 'theme_es',
     }
+    ,
+    'es_dcat_ap': {
+        'theme': 'theme_es',
+    },
 }
 
 # SpanishDCATProfile: Mandatory elements by NTI-RISP.
