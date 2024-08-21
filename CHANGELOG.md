@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v1.7.0...HEAD)
+## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v1.8.0...HEAD)
+
+## [v1.8.0](https://github.com/ckan/ckanext-dcat/compare/v1.7.0...v1.8.0) - 2024-06-07
+
+* Split profile classes into their own separate files. (#21)
 
 * Support for standard CKAN [ckanext-scheming](https://github.com/ckan/ckanext-scheming) schemas.
   The DCAT profiles now seamlessly integrate with fields defined via the YAML or JSON scheming files.
