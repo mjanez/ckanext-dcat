@@ -13,6 +13,10 @@ It also offers other features related to Semantic Data like exposing the necessa
 
 Check the [overview](#overview) section for a summary of the available features.
 
+> [!IMPORTANT]
+> * Custom releases of `ckan/ckanext-dcat:master` designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
+>*  `mjanez/ckanext-schemingdcat` contains [custom profiles](#custom-profiles) as `eu_dcat_ap_2`, `es_dcat` or `es_dcat_ap_2` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
+
 
 ## Contents
 
@@ -46,6 +50,7 @@ Check the [overview](#overview) section for a summary of the available features.
   * [Writing custom profiles](#writing-custom-profiles)
   * [Command line interface](#command-line-interface)
   * [Compatibility mode](#compatibility-mode)
+  - [Multilingual RDF support](#multilingual-rdf-support)
 - [XML DCAT harvester (deprecated)](#xml-dcat-harvester-deprecated)
 - [Translation of fields](#translation-of-fields)
 - [Structured data and Google Dataset Search indexing](#structured-data-and-google-dataset-search-indexing)
@@ -1028,6 +1033,38 @@ To disable this behavior, you can set the following config value in your ini fil
 
     ckanext.dcat.translate_keys = False
 
+## Multilingual RDF support
+`ckanext-schemingdcat` add multilingual values from CKAN to RDF, more info at: [schemingdcat documentation](https://github.com/mjanez/ckanext-schemingdcat?tab=readme-ov-file#multilingual-rdf-support)
+
+Example RDF:
+```xml
+<dct:title xml:lang="en">Dataset Title (EN)</dct:title>
+<dct:title xml:lang="de">Dataset Title (DE)</dct:title>
+<dct:title xml:lang="fr">Dataset Title (FR)</dct:title>
+```
+```json
+{
+    "title":
+        {
+            "en": "Dataset Title (EN)",
+            "de": "Dataset Title (DE)",
+            "fr": "Dataset Title (FR)"
+        }
+}
+```
+
+Example with missing language in RDF:
+```xml
+<dct:title>Dataset Title</dct:title>
+```
+```json
+{
+    "title":
+        {
+            "en": "Dataset Title"
+        }
+}
+```
 
 ## Structured data and Google Dataset Search indexing
 
