@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '1.8.0'
+version = '1.7.0'
 
 setup(
     name='ckanext-dcat',
@@ -43,8 +43,7 @@ setup(
     [ckan.rdf.profiles]
     euro_dcat_ap=ckanext.dcat.profiles:EuropeanDCATAPProfile
     euro_dcat_ap_2=ckanext.dcat.profiles:EuropeanDCATAP2Profile
-    spain_dcat=ckanext.dcat.profiles:SpanishDCATProfile
-    spain_dcat_ap=ckanext.dcat.profiles:SpanishDCATAPProfile
+    euro_dcat_ap_scheming=ckanext.dcat.profiles:EuropeanDCATAPSchemingProfile
     schemaorg=ckanext.dcat.profiles:SchemaOrgProfile
 
     [babel.extractors]
