@@ -11,7 +11,7 @@ Ckanext-dcat is a [CKAN](https://github.com/ckan/ckan) extension that helps data
 > * Custom releases of `ckan/ckanext-dcat:master` designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
 >*  `mjanez/ckanext-schemingdcat` contains [custom profiles](#custom-profiles) as `eu_dcat_ap_3`, `es_dcat` or `es_dcat_ap_3` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
 
-> [!TIP]
+> [!NOTE]
 > Read the documentation for a full user guide:
 > https://docs.ckan.org/projects/ckanext-dcat
 
