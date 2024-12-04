@@ -7,13 +7,14 @@
 
 Ckanext-dcat is a [CKAN](https://github.com/ckan/ckan) extension that helps data publishers expose and consume metadata as serialized RDF documents using [DCAT](https://github.com/ckan/ckan).
 
-> [!IMPORTANT]
-> * Custom releases of `ckan/ckanext-dcat:master` designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
+> [!TIP]
+> * Fixes of `ckan/ckanext-dcat:master` designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
 >*  `mjanez/ckanext-schemingdcat` contains [custom profiles](#custom-profiles) as `eu_dcat_ap_3`, `es_dcat` or `es_dcat_ap_3` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
 
-> [!TIP]
+> [!IMPORTANT]
 > Read the documentation for a full user guide:
 > https://docs.ckan.org/projects/ckanext-dcat
+
 
 ## Overview
 
@@ -36,38 +37,8 @@ These are implemented internally using:
 
 * An [RDF Serializer](https://docs.ckan.org/projects/ckanext-dcat/en/latest/profiles#rdf-dcat-serializer) that allows to transform CKAN datasets metadata to different semantic formats, also allowing customizable [profiles](https://docs.ckan.org/projects/ckanext-dcat/en/latest/profiles#profiles).
 
-## Multilingual RDF support
-`ckanext-schemingdcat` add multilingual values from CKAN to RDF, more info at: [schemingdcat documentation](https://github.com/mjanez/ckanext-schemingdcat?tab=readme-ov-file#multilingual-rdf-support)
 
-Example RDF:
-```xml
-<dct:title xml:lang="en">Dataset Title (EN)</dct:title>
-<dct:title xml:lang="de">Dataset Title (DE)</dct:title>
-<dct:title xml:lang="fr">Dataset Title (FR)</dct:title>
-```
-```json
-{
-    "title":
-        {
-            "en": "Dataset Title (EN)",
-            "de": "Dataset Title (DE)",
-            "fr": "Dataset Title (FR)"
-        }
-}
-```
 
-Example with missing language in RDF:
-```xml
-<dct:title>Dataset Title</dct:title>
-```
-```json
-{
-    "title":
-        {
-            "en": "Dataset Title"
-        }
-}
-```
 
 ## Running the Tests
 
