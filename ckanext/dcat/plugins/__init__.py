@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from builtins import object
+from functools import wraps
 import os
 import json
 
@@ -19,6 +19,7 @@ from ckanext.dcat.logic import (dcat_dataset_show,
                                 dcat_datasets_list,
                                 dcat_auth,
                                 )
+from ckanext.dcat import helpers
 from ckanext.dcat import utils
 from ckanext.dcat.validators import dcat_validators
 
@@ -30,11 +31,22 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 I18N_DIR = os.path.join(HERE, u"../i18n")
 
 
-def config_declaration(func):
-    if p.toolkit.check_ckan_version(min_version="2.10.0"):
-        return p.toolkit.blanket.config_declarations(func)
-    else:
-        return func
+def config_declaration(arg=None):
+    supports_config_declaration = p.toolkit.check_ckan_version(min_version="2.10.0")
+
+    # @config_declaration with no args
+    if callable(arg):
+        if supports_config_declaration:
+            return p.toolkit.blanket.config_declarations(arg)
+        return arg
+
+    # @config_declaration with custom file
+    def decorator(cls):
+        if supports_config_declaration:
+            return p.toolkit.blanket.config_declarations(arg)(cls)
+        return cls
+
+    return decorator
 
 
 def _get_dataset_schema(dataset_type="dataset"):
@@ -81,7 +93,7 @@ class DCATPlugin(p.SingletonPlugin, DefaultTranslation):
     # IConfigurer
 
     def update_config(self, config):
-        p.toolkit.add_template_directory(config, '../templates')
+        p.toolkit.add_template_directory(config, '../templates/dcat')
 
         # Check catalog URI on startup to emit a warning if necessary
         utils.catalog_uri()
@@ -102,9 +114,8 @@ class DCATPlugin(p.SingletonPlugin, DefaultTranslation):
 
     def get_helpers(self):
         return {
-            'helper_available': utils.helper_available,
-            'dcat_get_endpoint': utils.get_endpoint,
-            'dcat_endpoints_enabled': utils.endpoints_enabled,
+            'dcat_get_endpoint': helpers.get_endpoint,
+            'dcat_endpoints_enabled': helpers.endpoints_enabled,
         }
 
     # IActions
@@ -242,12 +253,45 @@ class DCATJSONInterface(p.SingletonPlugin):
         }
 
 
+@config_declaration("config_declaration_structured_data.yml")
 class StructuredDataPlugin(p.SingletonPlugin):
+
+    p.implements(p.IConfigurer, inherit=True)
     p.implements(p.ITemplateHelpers, inherit=True)
+
+    # IConfigurer
+
+    def update_config(self, config):
+        p.toolkit.add_template_directory(config, '../templates/structured_data')
 
     # ITemplateHelpers
 
     def get_helpers(self):
         return {
-            'structured_data': utils.structured_data,
+            'structured_data': helpers.structured_data,
         }
+
+
+@config_declaration("config_declaration_croissant.yml")
+class CroissantPlugin(p.SingletonPlugin):
+
+    p.implements(p.IConfigurer, inherit=True)
+    p.implements(p.ITemplateHelpers, inherit=True)
+    p.implements(p.IBlueprint)
+
+    # IConfigurer
+
+    def update_config(self, config):
+        p.toolkit.add_template_directory(config, '../templates/croissant')
+
+    # ITemplateHelpers
+
+    def get_helpers(self):
+        return {
+            'croissant': helpers.croissant,
+        }
+
+    # IBlueprint
+
+    def get_blueprint(self):
+        return [blueprints.croissant]

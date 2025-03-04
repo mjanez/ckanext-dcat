@@ -2,18 +2,19 @@ import datetime
 import json
 from urllib.parse import quote
 
-from dateutil.parser import parse as parse_date
-from rdflib import term, URIRef, BNode, Literal
-from rdflib.namespace import Namespace, RDF, XSD, SKOS, RDFS, ORG
-from geomet import wkt, InvalidGeoJSONException
-
-from ckantoolkit import config, url_for, asbool, aslist, get_action, ObjectNotFound
-from ckan.model.license import LicenseRegister
 from ckan.lib.helpers import resource_formats
+from ckan.model.license import LicenseRegister
+from ckantoolkit import ObjectNotFound, asbool, aslist, config, get_action, url_for
+from dateutil.parser import parse as parse_date
+from geomet import InvalidGeoJSONException, wkt
+from rdflib import BNode, Literal, URIRef, term
+from rdflib.namespace import ORG, RDF, RDFS, SKOS, XSD, Namespace
+
 from ckanext.dcat.utils import DCAT_EXPOSE_SUBCATALOGS
-from ckanext.dcat.validators import is_year, is_year_month, is_date
+from ckanext.dcat.validators import is_date, is_year, is_year_month
 
 CNT = Namespace("http://www.w3.org/2011/content#")
+CR = Namespace("http://mlcommons.org/croissant/")
 DCT = Namespace("http://purl.org/dc/terms/")
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
 DCATAP = Namespace("http://data.europa.eu/r5r/")
@@ -30,6 +31,7 @@ SPDX = Namespace("http://spdx.org/rdf/terms#")
 
 namespaces = {
     "cnt": CNT,
+    "cr": CR,
     "dct": DCT,
     "dcat": DCAT,
     "dcatap": DCATAP,
@@ -536,7 +538,9 @@ class RDFProfile(object):
             agent_details = {}
             agent_details["uri"] = str(agent) if isinstance(agent, term.URIRef) else ""
             agent_details["name"] = self._object_value(agent, FOAF.name)
-            agent_details["email"] = self._object_value(agent, FOAF.mbox)
+            agent_details["email"] = self._without_mailto(
+                self._object_value(agent, FOAF.mbox)
+            )
             if not agent_details["email"]:
                 agent_details["email"] = self._without_mailto(
                     self._object_value(agent, VCARD.hasEmail)
@@ -573,6 +577,9 @@ class RDFProfile(object):
             )
 
             contact["identifier"] = self._get_vcard_property_value(agent, VCARD.hasUID)
+
+            contact["url"] = self._get_vcard_property_value(agent, VCARD.hasURL)
+
             contacts.append(contact)
 
         return contacts
@@ -818,9 +825,7 @@ class RDFProfile(object):
         or object.
         """
         spatial_formats = aslist(
-            config.get(
-                "ckanext.dcat.output_spatial_format", DEFAULT_SPATIAL_FORMATS
-            )
+            config.get("ckanext.dcat.output_spatial_format", DEFAULT_SPATIAL_FORMATS)
         )
     
         if isinstance(value, str):
