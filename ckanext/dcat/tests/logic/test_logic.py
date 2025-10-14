@@ -203,7 +203,7 @@ class TestPagination(object):
     @mock.patch('ckan.plugins.toolkit.request')
     def test_pagination_keeps_only_supported_params(self, mock_request):
 
-        mock_request.params = {'a': 1, 'b': 2, 'modified_since': '2018-03-22', 'profiles': 'schemaorg'}
+        mock_request.args = {'a': 1, 'b': 2, 'modified_since': '2018-03-22', 'profiles': 'schemaorg'}
         mock_request.host_url = 'http://ckan.test.ckan.net'
         mock_request.path = '/feed/catalog.xml'
 
@@ -231,7 +231,7 @@ class TestPagination(object):
     @mock.patch('ckan.plugins.toolkit.request')
     def test_pagination_with_dcat_base_uri(self, mock_request):
 
-        mock_request.params = {}
+        mock_request.args = {}
         mock_request.host_url = 'http://ckan.test.ckan.net'
         mock_request.path = '/feed/catalog.xml'
 
