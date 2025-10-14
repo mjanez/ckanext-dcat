@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v2.4.1...HEAD)
+## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v2.4.2...HEAD)
+
+
+## [v2.4.2](https://github.com/ckan/ckanext-dcat/compare/v2.4.1...v2.4.2) - 2025-10-14
+
+* Improve handling of multilingual properties in Agent properties ([#360](https://github.com/ckan/ckanext-dcat/pull/360))
+* Fix `AttributeError` on CKAN 2.12 ([#363](https://github.com/ckan/ckanext-dcat/pull/363))
 
 ## [v2.4.1](https://github.com/ckan/ckanext-dcat/compare/v2.4.0...v2.4.1) - 2025-09-25
 
