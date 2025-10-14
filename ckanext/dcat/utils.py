@@ -380,18 +380,17 @@ def check_access_header():
 
 
 def dcat_json_page():
-     data_dict = {
-         'page': toolkit.request.params.get('page'),
-         'modified_since': toolkit.request.params.get('modified_since'),
-     }
+    data_dict = {
+    'page': toolkit.request.args.get('page'),
+    'modified_since': toolkit.request.args.get('modified_since'),
+    }
 
-     try:
-         datasets = toolkit.get_action('dcat_datasets_list')({},
-                                                             data_dict)
-     except toolkit.ValidationError as e:
-         return toolkit.abort(409, str(e))
+    try:
+        datasets = toolkit.get_action('dcat_datasets_list')({}, data_dict)
+    except toolkit.ValidationError as e:
+        return toolkit.abort(409, str(e))
 
-     return datasets
+    return datasets
 
 
 def read_dataset_page(_id, _format):
@@ -428,15 +427,15 @@ def read_catalog_page(_format):
     if not _format:
         return index_endpoint()
 
-    _profiles = toolkit.request.params.get('profiles')
+    _profiles = toolkit.request.args.get('profiles')
     if _profiles:
         _profiles = _profiles.split(',')
 
     data_dict = {
-        'page': toolkit.request.params.get('page'),
-        'modified_since': toolkit.request.params.get('modified_since'),
-        'q': toolkit.request.params.get('q'),
-        'fq': toolkit.request.params.get('fq'),
+        'page': toolkit.request.args.get('page'),
+        'modified_since': toolkit.request.args.get('modified_since'),
+        'q': toolkit.request.args.get('q'),
+        'fq': toolkit.request.args.get('fq'),
         'format': _format,
         'profiles': _profiles,
     }
