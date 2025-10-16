@@ -965,13 +965,17 @@ class RDFProfile(object):
         spatial_formats = aslist(
             config.get("ckanext.dcat.output_spatial_format", DEFAULT_SPATIAL_FORMATS)
         )
-
+    
         if isinstance(value, str):
             try:
                 value = json.loads(value)
             except (TypeError, ValueError):
                 return
 
+        # Check if the predicate already exists for the spatial_ref. Location props have only one (0..1). https://github.com/mjanez/ckanext-dcat/issues/4
+        if (spatial_ref, predicate, None) in self.g:
+            return
+    
         if "wkt" in spatial_formats:
             # WKT, because GeoDCAT-AP says so
             try:
@@ -987,7 +991,7 @@ class RDFProfile(object):
                 )
             except (TypeError, ValueError, InvalidGeoJSONException):
                 pass
-
+    
         if "geojson" in spatial_formats:
             # GeoJSON
             self.g.add((spatial_ref, predicate, Literal(json.dumps(value), datatype=GEOJSON_IMT)))
