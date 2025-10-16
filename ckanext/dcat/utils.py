@@ -13,8 +13,10 @@ from ckan.exceptions import HelperError
 
 from ckan import model
 import ckan.plugins.toolkit as toolkit
+import ckan.plugins as plugins
 
 from ckanext.dcat.exceptions import RDFProfileException
+from ckanext.dcat.interfaces import IDCATURIGenerator
 
 from ckan.views.home import index as index_endpoint
 from ckan.views.dataset import read as read_endpoint
@@ -128,6 +130,13 @@ def catalog_uri():
                          'the `ckanext.dcat.base_uri` or `ckan.site_url` ' +
                          'option')
 
+    # Allow plugins to modify the catalog URI
+    for plugin in plugins.PluginImplementations(IDCATURIGenerator):
+        result = plugin.catalog_uri(uri)
+        if result is not None:
+            uri = result
+            break
+
     return uri
 
 
@@ -164,6 +173,13 @@ def dataset_uri(dataset_dict):
                                        str(uuid.uuid4()))
         log.warning('Using a random id for dataset URI')
 
+    # Allow plugins to modify the dataset URI
+    for plugin in plugins.PluginImplementations(IDCATURIGenerator):
+        result = plugin.dataset_uri(dataset_dict, uri)
+        if result is not None:
+            uri = result
+            break
+
     return uri
 
 
@@ -194,6 +210,13 @@ def resource_uri(resource_dict):
                                                     dataset_id,
                                                     resource_dict['id'])
 
+    # Allow plugins to modify the resource URI
+    for plugin in plugins.PluginImplementations(IDCATURIGenerator):
+        result = plugin.resource_uri(resource_dict, uri)
+        if result is not None:
+            uri = result
+            break
+
     return uri
 
 
@@ -208,11 +231,19 @@ def publisher_uri_organization_fallback(dataset_dict):
     Returns a string with the publisher URI, or None if no URI could be
     generated.
     '''
+    uri = None
     if dataset_dict.get('organization'):
-        return '{0}/organization/{1}'.format(catalog_uri().rstrip('/'),
+        uri = '{0}/organization/{1}'.format(catalog_uri().rstrip('/'),
                                             dataset_dict['organization']['id'])
 
-    return None
+    # Allow plugins to modify the publisher or organization URI
+    for plugin in plugins.PluginImplementations(IDCATURIGenerator):
+        result = plugin.publisher_uri(dataset_dict, uri)
+        if result is not None:
+            uri = result
+            break
+
+    return uri
 
 def dataset_id_from_resource(resource_dict):
     '''
@@ -349,18 +380,17 @@ def check_access_header():
 
 
 def dcat_json_page():
-     data_dict = {
-         'page': toolkit.request.params.get('page'),
-         'modified_since': toolkit.request.params.get('modified_since'),
-     }
+    data_dict = {
+    'page': toolkit.request.args.get('page'),
+    'modified_since': toolkit.request.args.get('modified_since'),
+    }
 
-     try:
-         datasets = toolkit.get_action('dcat_datasets_list')({},
-                                                             data_dict)
-     except toolkit.ValidationError as e:
-         return toolkit.abort(409, str(e))
+    try:
+        datasets = toolkit.get_action('dcat_datasets_list')({}, data_dict)
+    except toolkit.ValidationError as e:
+        return toolkit.abort(409, str(e))
 
-     return datasets
+    return datasets
 
 
 def read_dataset_page(_id, _format):
@@ -370,7 +400,7 @@ def read_dataset_page(_id, _format):
     if not _format:
         return read_endpoint(_get_package_type(_id), _id)
 
-    _profiles = toolkit.request.params.get('profiles')
+    _profiles = toolkit.request.args.get('profiles')
     if _profiles:
         _profiles = _profiles.split(',')
 
@@ -397,15 +427,15 @@ def read_catalog_page(_format):
     if not _format:
         return index_endpoint()
 
-    _profiles = toolkit.request.params.get('profiles')
+    _profiles = toolkit.request.args.get('profiles')
     if _profiles:
         _profiles = _profiles.split(',')
 
     data_dict = {
-        'page': toolkit.request.params.get('page'),
-        'modified_since': toolkit.request.params.get('modified_since'),
-        'q': toolkit.request.params.get('q'),
-        'fq': toolkit.request.params.get('fq'),
+        'page': toolkit.request.args.get('page'),
+        'modified_since': toolkit.request.args.get('modified_since'),
+        'q': toolkit.request.args.get('q'),
+        'fq': toolkit.request.args.get('fq'),
         'format': _format,
         'profiles': _profiles,
     }

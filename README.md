@@ -6,6 +6,7 @@
 
 Ckanext-dcat is a [CKAN](https://github.com/ckan/ckan) extension that helps data publishers expose and consume metadata as serialized RDF documents using [DCAT](https://github.com/ckan/ckan).
 
+This extension is currently supported in CKAN 2.10 and CKAN 2.11.
 > [!TIP]
 > * Fixes of `ckan/ckanext-dcat:master` designed for use with: [`mjanez/ckanext-schemingdcat`](https://github.com/mjanez/schemingdcat)
 >*  `mjanez/ckanext-schemingdcat` contains [custom profiles](#custom-profiles) as `eu_dcat_ap_3`, `es_dcat` or `es_dcat_ap_3` to be used with [Spanish context for some codelists and metadata properties (GeoDCAT-AP ES)](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-es) or [GeoDCAT-AP EU version](https://github.com/mjanez/ckanext-schemingdcat#geodcat-ap-eu).  All schema information is available in the [README](https://github.com/mjanez/ckanext-schemingdcat#schemas))
@@ -25,7 +26,7 @@ In terms of CKAN features, this extension offers:
 
 * An [RDF Harvester](https://docs.ckan.org/projects/ckanext-dcat/en/latest/harvester) that allows importing RDF serializations from other catalogs to create CKAN datasets (`dcat_rdf_harvester` plugin).
 
-* Other features like [Command Line Interface](https://docs.ckan.org/projects/ckanext-dcat/en/latest/cli) or support for indexing in [Google Dataset Search](https://docs.ckan.org/projects/ckanext-dcat/en/latest/google-dataset-search).
+* Other features like [Command Line Interface](https://docs.ckan.org/projects/ckanext-dcat/en/latest/cli), support for indexing in [Google Dataset Search](https://docs.ckan.org/projects/ckanext-dcat/en/latest/google-dataset-search) or endpoints for exposing datasets in the [Croissant ML](https://docs.ckan.org/projects/ckanext-dcat/en/latest/croissant) format.
 
 
 These are implemented internally using:

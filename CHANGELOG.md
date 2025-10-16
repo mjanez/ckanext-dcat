@@ -1,13 +1,40 @@
 # Changelog
 
-## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v2.3.0...HEAD)
+## [Unreleased](https://github.com/ckan/ckanext-dcat/compare/v2.4.2...HEAD)
 
+
+## [v2.4.2](https://github.com/ckan/ckanext-dcat/compare/v2.4.1...v2.4.2) - 2025-10-14
+
+* Improve handling of multilingual properties in Agent properties ([#360](https://github.com/ckan/ckanext-dcat/pull/360))
+* Fix `AttributeError` on CKAN 2.12 ([#363](https://github.com/ckan/ckanext-dcat/pull/363))
+
+## [v2.4.1](https://github.com/ckan/ckanext-dcat/compare/v2.4.0...v2.4.1) - 2025-09-25
+
+* Fix regression redirect from /dataset to /dataset_series ([#362](https://github.com/ckan/ckanext-dcat/pull/362))
+* Provide default language in Croissant JSON-LD context ([#361](https://github.com/ckan/ckanext-dcat/pull/361))
+* Added [`IDCATURIGenerator`](https://docs.ckan.org/projects/ckanext-dcat/en/latest/uri-customization/)
+  plugin interface to allow customization of the URIs generation ([#351](https://github.com/ckan/ckanext-dcat/pull/351))
+* Added support for new fields to DCAT classes: `dcat:Dataset` (`prov:wasGeneratedBy`, `prov:qualifiedAttribution`,
+  `dcat:hasVersion`), `dcat:Catalog` (`foaf:homepage`), `dcat:DataService` (`dct:conformsTo`, `dct:format`, 
+  `dct:identifier`, `dct:language`, `dct:rights`, `dcat:landingPage`, `dcat:keyword`) ([#352](https://github.com/ckan/ckanext-dcat/pull/352))
+* Add HealthDCAT-AP mapping to CKAN field mapping table ([#347](https://github.com/ckan/ckanext-dcat/pull/347))
+* Docs: Add HealthDCAT-AP mapping to CKAN field mapping table ([#347](https://github.com/ckan/ckanext-dcat/pull/347))
+
+
+## [v2.4.0](https://github.com/ckan/ckanext-dcat/compare/v2.3.0...v2.4.0) - 2025-05-20
+
+* Add support for [Dataset Series](https://docs.ckan.org/projects/ckanext-dcat/en/latest/dataset-series/) via integration with [ckanext-dataset-series](https://github.com/ckan/ckanext-dataset-series).
+  Ckanext-dataset-series takes care of all the underlying management of the series, and ckanext-dcat exposes them
+  using `dcat:DatasetSeries` classes. Check the [documentation](https://docs.ckan.org/projects/ckanext-dcat/en/latest/dataset-series/) for all details on how to set them up.
+* Add `trusted_data_holder` field to HealthDCAT-AP schema ([#345](https://github.com/ckan/ckanext-dcat/pull/345))
+* Fix TIME namespace definition to include trailing hash (`#`), ensuring compliance with W3C Time Ontology and DCAT-AP. This may require updates for custom profiles relying on the old variant. ([#344](https://github.com/ckan/ckanext-dcat/pull/344))
+* Add missing URIRefOrLiteral import in profiles module. ([#343](https://github.com/ckan/ckanext-dcat/pull/343))
 
 ## [v2.3.0](https://github.com/ckan/ckanext-dcat/compare/v2.2.0...v2.3.0) - 2025-02-25
 
 * New profile to support the [Croissant](https://mlcommons.org/working-groups/data/croissant/) format.
   Croissant is a community standard for describing ML datasets. The new `croissant` plugin allows a CKAN site to
-  expose its datasets using the [Croissant format specification](https://docs.mlcommons.org/croissant/docs/croissant-spec.html). Check the [documentation](https://docs.ckan.org/projects/ckanext-dcat/en/latest/croissant/) for more information on schema mapping, features supported and examples. Thanks to [@Reikyo](https://github.com/Reikyo) for their contributions ([#339](https://docs.ckan.org/projects/ckanext-dcat/en/latest/croissant://github.com/ckan/ckanext-dcat/pull/339), [#341](https://github.com/ckan/ckanext-dcat/pull/341))
+  expose its datasets using the [Croissant format specification](https://docs.mlcommons.org/croissant/docs/croissant-spec.html). Check the [documentation](https://docs.ckan.org/projects/ckanext-dcat/en/latest/croissant/) for more information on schema mapping, features supported and examples. Thanks to [@Reikyo](https://github.com/Reikyo) for their contributions ([#339](https://github.com/ckan/ckanext-dcat/pull/339), [#341](https://github.com/ckan/ckanext-dcat/pull/341))
 * Fix `has_version` in HealthDCAT schema ([#336](https://github.com/ckan/ckanext-dcat/pull/336))
 * Include dependencies in pyproject.toml, publish extension on PyPI. This means that starting from ckanext-dcat 2.3.0 the extension can be installed by running:
     ```

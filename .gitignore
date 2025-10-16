@@ -16,4 +16,5 @@ build/*
 tmp/*
 package/DEBIAN/control
 *.swp
-.vscode/*
+.idea
+.vscode
